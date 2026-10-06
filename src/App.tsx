@@ -55,10 +55,18 @@ import {
   sortByDocumentOrder,
 } from "@/editor/suggestionActions";
 import { usePassRunner } from "@/hooks/usePassRunner";
+import { type ThemePreference, useTheme } from "@/hooks/useTheme";
 import { downloadTextFile, filenameStem, pickTextFile } from "@/lib/files";
 import { runtime } from "@/runtime";
 
 const ACTIVE_DOCUMENT_KEY = "writing-workshop:active-document";
+
+/** Order the theme button cycles through. */
+const NEXT_THEME: Record<ThemePreference, ThemePreference> = {
+  dark: "system",
+  light: "dark",
+  system: "light",
+};
 
 // Stable empty values so live-query fallbacks do not defeat memoisation.
 const NO_PROMPTS: ReadonlyArray<PassPrompt> = [];
@@ -607,6 +615,7 @@ const App = () => {
   const settings = useLiveQuery(() => db.settings.get("settings"), []) ?? DEFAULT_SETTINGS;
   const [activeDocumentId, setActiveDocumentId] = useState<DocumentId | null>(readStoredDocumentId);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const theme = useTheme();
 
   useEffect(() => {
     void seedDefaults();
@@ -652,12 +661,14 @@ const App = () => {
         activeId={activeDocumentId}
         documents={documents ?? []}
         onCreate={() => void create()}
+        onCycleTheme={() => theme.setPreference(NEXT_THEME[theme.preference])}
         onDelete={(id) => void confirmDeleteDocument(id)}
         onExportBackup={() => void backupToFile()}
         onImportBackup={() => void restoreFromFile()}
         onImportMarkdown={() => void importMarkdown()}
         onOpenSettings={() => setSettingsOpen(true)}
         onSelect={setActiveDocumentId}
+        theme={theme.preference}
       />
       {activeDocument === null ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -667,7 +678,7 @@ const App = () => {
         <Workspace doc={activeDocument} key={activeDocument.id} />
       )}
       <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} settings={settings} />
-      <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" theme={theme.resolved} />
     </div>
   );
 };

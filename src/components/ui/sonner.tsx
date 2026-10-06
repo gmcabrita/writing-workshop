@@ -28,7 +28,6 @@ const Toaster = ({ ...props }: ToasterProps) => (
       warning: <TriangleAlertIcon className="size-4" />,
     }}
     style={toasterStyle}
-    theme="light"
     toastOptions={{
       classNames: {
         toast: "cn-toast",

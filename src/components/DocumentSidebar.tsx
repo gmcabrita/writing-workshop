@@ -2,38 +2,65 @@ import {
   DownloadIcon,
   FileTextIcon,
   FileUpIcon,
+  type LucideIcon,
+  MonitorIcon,
+  MoonIcon,
   PlusIcon,
   SettingsIcon,
+  SunIcon,
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { DocumentId, WorkshopDocument } from "@/domain/model";
+import type { ThemePreference } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
+
+const THEME_ICON: Record<ThemePreference, LucideIcon> = {
+  dark: MoonIcon,
+  light: SunIcon,
+  system: MonitorIcon,
+};
+
+const ThemeIcon = ({ theme }: { readonly theme: ThemePreference }) => {
+  const Icon = THEME_ICON[theme];
+
+  return <Icon />;
+};
+
+const THEME_LABEL: Record<ThemePreference, string> = {
+  dark: "Dark",
+  light: "Light",
+  system: "System",
+};
 
 export interface DocumentSidebarProps {
   readonly activeId: DocumentId | null;
   readonly documents: ReadonlyArray<WorkshopDocument>;
   onCreate(): void;
+  onCycleTheme(): void;
   onDelete(id: DocumentId): void;
   onExportBackup(): void;
   onImportBackup(): void;
   onImportMarkdown(): void;
   onOpenSettings(): void;
   onSelect(id: DocumentId): void;
+  readonly theme: ThemePreference;
 }
 
 export const DocumentSidebar = ({
   activeId,
   documents,
   onCreate,
+  onCycleTheme,
   onDelete,
   onExportBackup,
   onImportBackup,
   onImportMarkdown,
   onOpenSettings,
   onSelect,
+  theme,
 }: DocumentSidebarProps) => (
   <aside className="flex h-full w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
     <div className="flex items-center justify-between px-3 py-3">
@@ -90,10 +117,21 @@ export const DocumentSidebar = ({
         <UploadIcon />
         Restore backup…
       </Button>
-      <Button className="w-full justify-start" onClick={onOpenSettings} size="sm" variant="ghost">
-        <SettingsIcon />
-        Settings
-      </Button>
+      <div className="flex items-center gap-0.5">
+        <Button className="flex-1 justify-start" onClick={onOpenSettings} size="sm" variant="ghost">
+          <SettingsIcon />
+          Settings
+        </Button>
+        <Button
+          aria-label={`Theme: ${THEME_LABEL[theme]}. Click to change.`}
+          onClick={onCycleTheme}
+          size="icon-sm"
+          title={`Theme: ${THEME_LABEL[theme]}`}
+          variant="ghost"
+        >
+          <ThemeIcon theme={theme} />
+        </Button>
+      </div>
     </div>
   </aside>
 );
