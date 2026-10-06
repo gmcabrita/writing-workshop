@@ -1,0 +1,208 @@
+import type { JSONContent } from "@tiptap/core";
+
+import { db } from "@/db/database";
+import {
+  DEFAULT_PASS_PROMPTS,
+  DEFAULT_SETTINGS,
+  type DocumentId,
+  EMPTY_DOCUMENT_CONTENT,
+  type LlmConfig,
+  newDocumentId,
+  newPassId,
+  newPassPromptId,
+  newRevisionId,
+  newSuggestionId,
+  type Pass,
+  type PassId,
+  type PassPrompt,
+  type PassPromptId,
+  type PassStatus,
+  type Revision,
+  type RevisionId,
+  type Settings,
+  type Suggestion,
+  type SuggestionId,
+  type SuggestionStatus,
+  TONE_COUNT,
+  type WorkshopDocument,
+} from "@/domain/model";
+
+/* Documents */
+
+export const createDocument = async (title: string): Promise<WorkshopDocument> => {
+  const now = Date.now();
+
+  const document: WorkshopDocument = {
+    content: EMPTY_DOCUMENT_CONTENT,
+    createdAt: now,
+    id: newDocumentId(),
+    title,
+    updatedAt: now,
+  };
+
+  await db.documents.add(document);
+
+  return document;
+};
+
+export const saveDocumentContent = (id: DocumentId, content: JSONContent): Promise<number> =>
+  db.documents.update(id, { content, updatedAt: Date.now() });
+
+export const renameDocument = (id: DocumentId, title: string): Promise<number> =>
+  db.documents.update(id, { title, updatedAt: Date.now() });
+
+export const deleteDocument = (id: DocumentId): Promise<void> =>
+  db.transaction("rw", [db.documents, db.revisions, db.passes, db.suggestions], async () => {
+    await db.documents.delete(id);
+    await db.revisions.where("documentId").equals(id).delete();
+    await db.passes.where("documentId").equals(id).delete();
+    await db.suggestions.where("documentId").equals(id).delete();
+  });
+
+/* Revisions */
+
+export const createRevision = async (
+  documentId: DocumentId,
+  content: JSONContent,
+  label: string,
+  major: boolean,
+): Promise<Revision> => {
+  const revision: Revision = {
+    content,
+    createdAt: Date.now(),
+    documentId,
+    id: newRevisionId(),
+    label,
+    major,
+  };
+
+  await db.revisions.add(revision);
+
+  return revision;
+};
+
+export const setRevisionMajor = (id: RevisionId, major: boolean): Promise<number> =>
+  db.revisions.update(id, { major });
+
+export const relabelRevision = (id: RevisionId, label: string): Promise<number> =>
+  db.revisions.update(id, { label });
+
+export const deleteRevision = (id: RevisionId): Promise<void> => db.revisions.delete(id);
+
+/* Passes and suggestions */
+
+export const createPass = async (documentId: DocumentId, promptName: string): Promise<Pass> => {
+  const existing = await db.passes.where("documentId").equals(documentId).count();
+
+  const pass: Pass = {
+    createdAt: Date.now(),
+    documentId,
+    error: null,
+    id: newPassId(),
+    promptName,
+    status: "running",
+    tone: existing % TONE_COUNT,
+  };
+
+  await db.passes.add(pass);
+
+  return pass;
+};
+
+export const finishPass = (id: PassId, status: PassStatus, error: string | null): Promise<number> =>
+  db.passes.update(id, { error, status });
+
+export const deletePass = (id: PassId): Promise<void> =>
+  db.transaction("rw", [db.passes, db.suggestions], async () => {
+    await db.passes.delete(id);
+    await db.suggestions.where("passId").equals(id).delete();
+  });
+
+export interface SuggestionDraft {
+  readonly comment: string;
+  readonly quote: string;
+  readonly replacement: string | null;
+}
+
+export const addSuggestions = async (
+  documentId: DocumentId,
+  passId: PassId,
+  drafts: ReadonlyArray<SuggestionDraft>,
+): Promise<ReadonlyArray<Suggestion>> => {
+  const now = Date.now();
+
+  const suggestions = drafts.map((draft, order): Suggestion => ({
+    comment: draft.comment,
+    createdAt: now,
+    documentId,
+    id: newSuggestionId(),
+    order,
+    passId,
+    quote: draft.quote,
+    replacement: draft.replacement,
+    status: "open",
+  }));
+
+  await db.suggestions.bulkAdd(suggestions);
+
+  return suggestions;
+};
+
+export const setSuggestionStatus = (id: SuggestionId, status: SuggestionStatus): Promise<number> =>
+  db.suggestions.update(id, { status });
+
+export const updateSuggestionComment = (id: SuggestionId, comment: string): Promise<number> =>
+  db.suggestions.update(id, { comment });
+
+export const deleteSuggestion = (id: SuggestionId): Promise<void> => db.suggestions.delete(id);
+
+/* Prompts and settings */
+
+export const loadSettings = async (): Promise<Settings> =>
+  (await db.settings.get("settings")) ?? DEFAULT_SETTINGS;
+
+export const saveSettings = (settings: Settings): Promise<"settings"> => db.settings.put(settings);
+
+export const saveLlmConfig = async (llm: LlmConfig): Promise<"settings"> => {
+  const current = await loadSettings();
+
+  return saveSettings({ ...current, llm });
+};
+
+export const saveSystemPrompt = async (systemPrompt: string): Promise<"settings"> => {
+  const current = await loadSettings();
+
+  return saveSettings({ ...current, systemPrompt });
+};
+
+export const createPassPrompt = async (name: string, prompt: string): Promise<PassPrompt> => {
+  const count = await db.passPrompts.count();
+  const passPrompt: PassPrompt = { id: newPassPromptId(), name, order: count, prompt };
+
+  await db.passPrompts.add(passPrompt);
+
+  return passPrompt;
+};
+
+export const updatePassPrompt = (id: PassPromptId, name: string, prompt: string): Promise<number> =>
+  db.passPrompts.update(id, { name, prompt });
+
+export const deletePassPrompt = (id: PassPromptId): Promise<void> => db.passPrompts.delete(id);
+
+/** Replace every pass prompt with the built-in set. */
+export const restoreDefaultPassPrompts = (): Promise<void> =>
+  db.transaction("rw", db.passPrompts, async () => {
+    await db.passPrompts.clear();
+    await db.passPrompts.bulkAdd(
+      DEFAULT_PASS_PROMPTS.map((prompt): PassPrompt => ({ ...prompt, id: newPassPromptId() })),
+    );
+  });
+
+/** Populate default prompts the first time the app runs. */
+export const seedDefaults = async (): Promise<void> => {
+  const count = await db.passPrompts.count();
+
+  if (count === 0) {
+    await restoreDefaultPassPrompts();
+  }
+};
