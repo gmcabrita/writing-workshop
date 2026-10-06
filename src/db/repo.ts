@@ -151,6 +151,12 @@ export const addSuggestions = async (
 export const setSuggestionStatus = (id: SuggestionId, status: SuggestionStatus): Promise<number> =>
   db.suggestions.update(id, { status });
 
+export const reopenSuggestions = (ids: ReadonlyArray<SuggestionId>): Promise<number> =>
+  db.suggestions
+    .where("id")
+    .anyOf([...ids])
+    .modify({ status: "open" });
+
 export const updateSuggestionComment = (id: SuggestionId, comment: string): Promise<number> =>
   db.suggestions.update(id, { comment });
 

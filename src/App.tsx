@@ -19,6 +19,7 @@ import {
   deletePass,
   deleteSuggestion,
   renameDocument,
+  reopenSuggestions,
   saveDocumentContent,
   seedDefaults,
   setSuggestionStatus,
@@ -127,11 +128,9 @@ const Workspace = ({ doc }: WorkspaceProps) => {
       [doc.id],
     ) ?? NO_PASSES;
 
-  const openSuggestions =
-    useLiveQuery(
-      () => db.suggestions.where({ documentId: doc.id, status: "open" }).toArray(),
-      [doc.id],
-    ) ?? NO_SUGGESTIONS;
+  const suggestions =
+    useLiveQuery(() => db.suggestions.where("documentId").equals(doc.id).toArray(), [doc.id]) ??
+    NO_SUGGESTIONS;
 
   const runner = usePassRunner(editor, doc.id, settings);
 
@@ -155,11 +154,25 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     }
   }, [activeId, editor, pmDoc]);
 
-  /** Open suggestions that still have a highlight, in document order. */
+  /**
+   * Suggestions that still have a highlight, in document order. The mark in
+   * the document is the source of truth: editor undo can bring back a
+   * highlight that was accepted or dismissed, and it must show again.
+   */
   const orderedSuggestions = useMemo(
-    () => (pmDoc === null ? NO_SUGGESTIONS : sortByDocumentOrder(pmDoc, openSuggestions)),
-    [openSuggestions, pmDoc],
+    () => (pmDoc === null ? NO_SUGGESTIONS : sortByDocumentOrder(pmDoc, suggestions)),
+    [pmDoc, suggestions],
   );
+
+  // Reconcile status with the document: a highlight that came back via undo
+  // reopens its note.
+  useEffect(() => {
+    const reopened = orderedSuggestions.filter((suggestion) => suggestion.status !== "open");
+
+    if (reopened.length > 0) {
+      void reopenSuggestions(reopened.map((suggestion) => suggestion.id));
+    }
+  }, [orderedSuggestions]);
 
   const passesById = useMemo(() => {
     const map = new Map<PassId, Pass>(passes.map((pass) => [pass.id, pass]));
