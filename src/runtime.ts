@@ -1,6 +1,10 @@
-import { ManagedRuntime } from "effect";
+import { Layer, ManagedRuntime } from "effect";
 
+import { LlmClient } from "@/llm/LlmClient";
 import { Workshop } from "@/llm/Workshop";
 
-/** Single Effect runtime for the whole app. React code calls `runtime.runPromise`. */
-export const runtime = ManagedRuntime.make(Workshop.layer);
+/**
+ * Single Effect runtime for the whole app. React code calls `runtime.runPromise`.
+ * LlmClient is exposed alongside Workshop so settings can test a connection.
+ */
+export const runtime = ManagedRuntime.make(Layer.mergeAll(Workshop.layer, LlmClient.layer));

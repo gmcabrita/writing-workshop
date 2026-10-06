@@ -1,6 +1,10 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { Effect } from "effect";
+import { Loader2Icon, PlugZapIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+
+import { LlmClient } from "@/llm/LlmClient";
+import { runtime } from "@/runtime";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,8 +42,57 @@ export interface SettingsDialogProps {
   readonly settings: Settings;
 }
 
+type ConnectionTest =
+  | { readonly kind: "idle" }
+  | { readonly kind: "running" }
+  | { readonly kind: "ok"; readonly ms: number; readonly reply: string }
+  | { readonly kind: "failed"; readonly message: string };
+
+/** One tiny completion against the draft config, with a 30 second cap. */
+const testConnection = (config: LlmConfig): Effect.Effect<ConnectionTest, never, LlmClient> =>
+  Effect.gen(function* () {
+    const client = yield* LlmClient;
+    const started = Date.now();
+
+    const reply = yield* client.complete({ ...config, jsonMode: false }, [
+      { content: "Reply with the single word OK.", role: "user" },
+    ]);
+
+    return { kind: "ok", ms: Date.now() - started, reply: reply.trim().slice(0, 80) } as const;
+  }).pipe(
+    Effect.timeout("30 seconds"),
+    Effect.catchTag("TimeoutError", () =>
+      Effect.succeed({ kind: "failed", message: "No reply within 30 seconds." } as const),
+    ),
+    Effect.catchTag("LlmError", (error) =>
+      Effect.succeed({ kind: "failed", message: error.message } as const),
+    ),
+  );
+
+const ConnectionTestResult = ({ result }: { readonly result: ConnectionTest }) => {
+  if (result.kind === "ok") {
+    return (
+      <span className="text-xs text-emerald-700 dark:text-emerald-400">
+        Connected in {result.ms} ms. Reply: “{result.reply}”
+      </span>
+    );
+  }
+
+  if (result.kind === "failed") {
+    return <span className="text-xs text-destructive">{result.message}</span>;
+  }
+
+  return null;
+};
+
 const ConnectionTab = ({ llm }: { readonly llm: LlmConfig }) => {
   const [draft, setDraft] = useState<LlmConfig>(llm);
+  const [test, setTest] = useState<ConnectionTest>({ kind: "idle" });
+
+  const runTest = async () => {
+    setTest({ kind: "running" });
+    setTest(await runtime.runPromise(testConnection(draft)));
+  };
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(llm);
 
@@ -111,7 +164,19 @@ const ConnectionTab = ({ llm }: { readonly llm: LlmConfig }) => {
           onCheckedChange={(checked) => setDraft({ ...draft, jsonMode: checked })}
         />
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            disabled={test.kind === "running"}
+            onClick={() => void runTest()}
+            size="sm"
+            variant="outline"
+          >
+            {test.kind === "running" ? <Loader2Icon className="animate-spin" /> : <PlugZapIcon />}
+            Test connection
+          </Button>
+          <ConnectionTestResult result={test} />
+        </div>
         <Button disabled={!dirty} onClick={() => void saveLlmConfig(draft)}>
           Save connection
         </Button>
