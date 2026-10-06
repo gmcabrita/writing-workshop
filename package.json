@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "effect-tsgo patch --oxlint",
+    "prepare": "effect-tsgo patch --typescript --oxlint",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
