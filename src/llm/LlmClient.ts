@@ -1,5 +1,4 @@
 import { Context, Effect, Layer, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import type { LlmConfig } from "@/domain/model";
 
@@ -42,9 +41,21 @@ interface ChatCompletionRequestBody {
   temperature: number;
 }
 
+const describeFetchFailure = (cause: unknown): string => {
+  if (cause instanceof DOMException && cause.name === "AbortError") {
+    return "Request cancelled.";
+  }
+
+  return cause instanceof Error ? cause.message : "Network request failed.";
+};
+
 /**
  * Minimal OpenAI-compatible chat completions client. The endpoint is passed
  * per call because the writer can change it at any time in settings.
+ *
+ * Uses `fetch` directly rather than Effect's HttpClient: that client builds
+ * URLs against `location.origin`, which is the string "null" when the app is
+ * opened from a `file://` URL in Firefox, and every request fails.
  */
 export class LlmClient extends Context.Service<
   LlmClient,
@@ -55,12 +66,10 @@ export class LlmClient extends Context.Service<
     ): Effect.Effect<string, LlmError>;
   }
 >()("writing-workshop/llm/LlmClient") {
-  static readonly layer = Layer.effect(
+  static readonly layer = Layer.succeed(
     LlmClient,
-    Effect.gen(function* () {
-      const http = yield* HttpClient.HttpClient;
-
-      const complete = Effect.fn("LlmClient.complete")(function* (
+    LlmClient.of({
+      complete: Effect.fn("LlmClient.complete")(function* (
         config: LlmConfig,
         messages: ReadonlyArray<ChatMessage>,
       ) {
@@ -74,29 +83,33 @@ export class LlmClient extends Context.Service<
           body.response_format = { type: "json_object" };
         }
 
-        let request = HttpClientRequest.post(
-          `${trimTrailingSlash(config.baseUrl)}/chat/completions`,
-        ).pipe(HttpClientRequest.bodyJsonUnsafe(body), HttpClientRequest.acceptJson);
+        const headers = new Headers({
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        });
 
         if (config.apiKey.length > 0) {
-          request = HttpClientRequest.bearerToken(request, config.apiKey);
+          headers.set("Authorization", `Bearer ${config.apiKey}`);
         }
 
-        const response = yield* http
-          .execute(request)
-          .pipe(
-            Effect.mapError(
-              (error) => new LlmError({ message: `Request failed: ${error.message}` }),
-            ),
-          );
+        const response = yield* Effect.tryPromise({
+          catch: (cause) =>
+            new LlmError({ message: `Request failed: ${describeFetchFailure(cause)}` }),
+          try: (signal) =>
+            fetch(`${trimTrailingSlash(config.baseUrl)}/chat/completions`, {
+              body: JSON.stringify(body),
+              headers,
+              method: "POST",
+              signal,
+            }),
+        });
 
-        const text = yield* response.text.pipe(
-          Effect.mapError(
-            (error) => new LlmError({ message: `Could not read response: ${error.message}` }),
-          ),
-        );
+        const text = yield* Effect.tryPromise({
+          catch: () => new LlmError({ message: "Could not read the response body." }),
+          try: () => response.text(),
+        });
 
-        if (response.status < 200 || response.status >= 300) {
+        if (!response.ok) {
           const detail = yield* Effect.try(() => JSON.parse(text)).pipe(
             Effect.flatMap(decodeErrorBody),
             Effect.map((parsed) => parsed.error.message),
@@ -120,9 +133,7 @@ export class LlmClient extends Context.Service<
         }
 
         return content;
-      });
-
-      return LlmClient.of({ complete });
+      }),
     }),
-  ).pipe(Layer.provide(FetchHttpClient.layer));
+  );
 }

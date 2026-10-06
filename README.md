@@ -15,7 +15,7 @@ pnpm check        # typecheck + format check + lint (anti-slop rules)
 ```
 
 `dist/index.html` inlines all JS, CSS, and fonts. Open it from disk in Chrome
-or Firefox. No CDN or external assets are used.
+or Firefox (both verified from `file://`). No CDN or external assets are used.
 
 Remote endpoints need CORS enabled for a `file://` origin (`Access-Control-Allow-Origin: *`).
 Local servers (Ollama, LM Studio, llama.cpp, vLLM) usually allow this by default.
