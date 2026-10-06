@@ -1,6 +1,7 @@
 import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { useLiveQuery } from "dexie-react-hooks";
+import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
@@ -10,10 +11,12 @@ import { PassToolbar } from "@/components/PassToolbar";
 import { RevisionsDialog } from "@/components/RevisionsDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { Toaster } from "@/components/ui/sonner";
+import { exportBackup, importBackup } from "@/db/backup";
 import { db } from "@/db/database";
 import {
   addSuggestions,
   createDocument,
+  createDocumentWithContent,
   createRevision,
   deleteDocument,
   deletePass,
@@ -39,6 +42,7 @@ import {
   type WorkshopDocument,
 } from "@/domain/model";
 import type { TextRange } from "@/domain/textIndex";
+import { contentToMarkdown, markdownToContent } from "@/editor/markdown";
 import { ProseEditor } from "@/editor/ProseEditor";
 import {
   acceptSuggestionInEditor,
@@ -47,6 +51,8 @@ import {
   sortByDocumentOrder,
 } from "@/editor/suggestionActions";
 import { usePassRunner } from "@/hooks/usePassRunner";
+import { downloadTextFile, filenameStem, pickTextFile } from "@/lib/files";
+import { runtime } from "@/runtime";
 
 const ACTIVE_DOCUMENT_KEY = "writing-workshop:active-document";
 
@@ -56,6 +62,36 @@ const NO_PROMPTS: ReadonlyArray<PassPrompt> = [];
 const NO_PASSES: ReadonlyArray<Pass> = [];
 
 const NO_SUGGESTIONS: ReadonlyArray<Suggestion> = [];
+
+const backupToFile = async (): Promise<void> => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadTextFile(
+    `writing-workshop-backup-${stamp}.json`,
+    await exportBackup(),
+    "application/json",
+  );
+};
+
+const restoreFromFile = async (): Promise<void> => {
+  const picked = await pickTextFile(".json,application/json");
+
+  if (picked === null) {
+    return;
+  }
+
+  await runtime.runPromise(
+    importBackup(picked.text).pipe(
+      Effect.tap((summary) =>
+        Effect.sync(() =>
+          toast.success(
+            `Restored ${summary.documents} documents, ${summary.revisions} revisions, ${summary.suggestions} notes.`,
+          ),
+        ),
+      ),
+      Effect.catch((error) => Effect.sync(() => toast.error(error.message))),
+    ),
+  );
+};
 
 const confirmDeleteDocument = async (id: DocumentId): Promise<void> => {
   if (!window.confirm("Delete this document and all of its notes and revisions?")) {
@@ -338,6 +374,14 @@ const Workspace = ({ doc }: WorkspaceProps) => {
       <PassToolbar
         activeIndex={activeIndex}
         onDeletePass={(pass) => void removePass(pass)}
+        onExportMarkdown={() => {
+          const content = editor?.getJSON() ?? doc.content;
+          downloadTextFile(
+            `${filenameStem(doc.title)}.md`,
+            contentToMarkdown(content),
+            "text/markdown",
+          );
+        }}
         onNext={() => step(1)}
         onOpenRevisions={() => setRevisionsOpen(true)}
         onPrevious={() => step(-1)}
@@ -425,6 +469,22 @@ const App = () => {
     setActiveDocumentId(created.id);
   };
 
+  const importMarkdown = async () => {
+    const picked = await pickTextFile(".md,.markdown,.txt,text/markdown,text/plain");
+
+    if (picked === null) {
+      return;
+    }
+
+    const created = await createDocumentWithContent(
+      picked.name.replace(/\.(md|markdown|txt)$/i, ""),
+      markdownToContent(picked.text),
+    );
+
+    setActiveDocumentId(created.id);
+    toast.success(`Imported “${created.title}”.`);
+  };
+
   // Fall back to the most recent document when the stored one is gone.
   const activeDocument =
     documents?.find((entry) => entry.id === activeDocumentId) ?? documents?.[0] ?? null;
@@ -436,6 +496,9 @@ const App = () => {
         documents={documents ?? []}
         onCreate={() => void create()}
         onDelete={(id) => void confirmDeleteDocument(id)}
+        onExportBackup={() => void backupToFile()}
+        onImportBackup={() => void restoreFromFile()}
+        onImportMarkdown={() => void importMarkdown()}
         onOpenSettings={() => setSettingsOpen(true)}
         onSelect={setActiveDocumentId}
       />

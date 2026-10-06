@@ -29,11 +29,14 @@ import {
 
 /* Documents */
 
-export const createDocument = async (title: string): Promise<WorkshopDocument> => {
+export const createDocumentWithContent = async (
+  title: string,
+  content: JSONContent,
+): Promise<WorkshopDocument> => {
   const now = Date.now();
 
   const document: WorkshopDocument = {
-    content: EMPTY_DOCUMENT_CONTENT,
+    content,
     createdAt: now,
     id: newDocumentId(),
     title,
@@ -44,6 +47,9 @@ export const createDocument = async (title: string): Promise<WorkshopDocument> =
 
   return document;
 };
+
+export const createDocument = (title: string): Promise<WorkshopDocument> =>
+  createDocumentWithContent(title, EMPTY_DOCUMENT_CONTENT);
 
 export const saveDocumentContent = (id: DocumentId, content: JSONContent): Promise<number> =>
   db.documents.update(id, { content, updatedAt: Date.now() });

@@ -1,4 +1,12 @@
-import { FileTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
+import {
+  DownloadIcon,
+  FileTextIcon,
+  FileUpIcon,
+  PlusIcon,
+  SettingsIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { DocumentId, WorkshopDocument } from "@/domain/model";
@@ -9,6 +17,9 @@ export interface DocumentSidebarProps {
   readonly documents: ReadonlyArray<WorkshopDocument>;
   onCreate(): void;
   onDelete(id: DocumentId): void;
+  onExportBackup(): void;
+  onImportBackup(): void;
+  onImportMarkdown(): void;
   onOpenSettings(): void;
   onSelect(id: DocumentId): void;
 }
@@ -18,6 +29,9 @@ export const DocumentSidebar = ({
   documents,
   onCreate,
   onDelete,
+  onExportBackup,
+  onImportBackup,
+  onImportMarkdown,
   onOpenSettings,
   onSelect,
 }: DocumentSidebarProps) => (
@@ -63,7 +77,19 @@ export const DocumentSidebar = ({
         </ul>
       )}
     </nav>
-    <div className="border-t p-2">
+    <div className="flex flex-col gap-0.5 border-t p-2">
+      <Button className="w-full justify-start" onClick={onImportMarkdown} size="sm" variant="ghost">
+        <FileUpIcon />
+        Import Markdown…
+      </Button>
+      <Button className="w-full justify-start" onClick={onExportBackup} size="sm" variant="ghost">
+        <DownloadIcon />
+        Back up everything
+      </Button>
+      <Button className="w-full justify-start" onClick={onImportBackup} size="sm" variant="ghost">
+        <UploadIcon />
+        Restore backup…
+      </Button>
       <Button className="w-full justify-start" onClick={onOpenSettings} size="sm" variant="ghost">
         <SettingsIcon />
         Settings

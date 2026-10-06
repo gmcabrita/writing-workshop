@@ -1,6 +1,7 @@
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  DownloadIcon,
   HistoryIcon,
   Loader2Icon,
   PlayIcon,
@@ -22,6 +23,7 @@ import type { PassRunner } from "@/hooks/usePassRunner";
 export interface PassToolbarProps {
   readonly activeIndex: number;
   onDeletePass(pass: Pass): void;
+  onExportMarkdown(): void;
   onNext(): void;
   onOpenRevisions(): void;
   onPrevious(): void;
@@ -34,6 +36,7 @@ export interface PassToolbarProps {
 export const PassToolbar = ({
   activeIndex,
   onDeletePass,
+  onExportMarkdown,
   onNext,
   onOpenRevisions,
   onPrevious,
@@ -142,7 +145,11 @@ export const PassToolbar = ({
         ))}
       </div>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-1">
+        <Button onClick={onExportMarkdown} size="sm" title="Download as Markdown" variant="ghost">
+          <DownloadIcon />
+          Export
+        </Button>
         <Button onClick={onOpenRevisions} size="sm" variant="ghost">
           <HistoryIcon />
           Revisions
