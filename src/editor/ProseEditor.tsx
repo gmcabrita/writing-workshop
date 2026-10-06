@@ -6,13 +6,16 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import {
   BoldIcon,
+  CheckIcon,
   CodeIcon,
   Highlighter,
   ItalicIcon,
+  LinkIcon,
   StrikethroughIcon,
   UnderlineIcon,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Predicate } from "effect";
+import { useEffect, useRef, useState } from "react";
 
 import { SlashCommand } from "@/editor/SlashCommand";
 import { SuggestionMark, suggestionIdsAt } from "@/editor/SuggestionMark";
@@ -72,6 +75,11 @@ export const ProseEditor = ({
   onSuggestionClick,
 }: ProseEditorProps) => {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [linkEditing, setLinkEditing] = useState(false);
+  const [linkDraft, setLinkDraft] = useState("");
+  // Mod+K opens the link editor; read through a ref because editorProps are
+  // captured once when the editor is created.
+  const openLinkRef = useRef<() => void>(() => {});
   // editorProps are captured once when the editor is created, so the click
   // handler reads the latest callback through a ref.
   const suggestionClickRef = useRef(onSuggestionClick);
@@ -107,6 +115,16 @@ export const ProseEditor = ({
           return false;
         },
       },
+      handleKeyDown: (_view, event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+          event.preventDefault();
+          openLinkRef.current();
+
+          return true;
+        }
+
+        return false;
+      },
     },
     extensions: [
       StarterKit.configure({
@@ -131,6 +149,16 @@ export const ProseEditor = ({
   });
 
   useEffect(() => {
+    openLinkRef.current = () => {
+      if (editor !== null && !editor.state.selection.empty) {
+        const href = editor.getAttributes("link").href;
+        setLinkDraft(Predicate.isString(href) ? href : "");
+        setLinkEditing(true);
+      }
+    };
+  }, [editor]);
+
+  useEffect(() => {
     onReady(editor);
 
     return () => onReady(null);
@@ -149,6 +177,25 @@ export const ProseEditor = ({
     return null;
   }
 
+  const openLinkEditor = () => {
+    const href = editor.getAttributes("link").href;
+    setLinkDraft(Predicate.isString(href) ? href : "");
+    setLinkEditing(true);
+  };
+
+  const applyLink = () => {
+    const href = linkDraft.trim();
+    const chain = editor.chain().focus().extendMarkRange("link");
+
+    if (href.length === 0) {
+      chain.unsetLink().run();
+    } else {
+      chain.setLink({ href: /^[a-z][a-z0-9+.-]*:/i.test(href) ? href : `https://${href}` }).run();
+    }
+
+    setLinkEditing(false);
+  };
+
   const annotateSelection = () => {
     const { from, to } = editor.state.selection;
 
@@ -164,9 +211,41 @@ export const ProseEditor = ({
       <BubbleMenu
         className="flex items-center gap-0.5 rounded-lg border bg-popover p-1 shadow-md"
         editor={editor}
-        options={{ offset: 8, placement: "top" }}
+        options={{ offset: 8, onHide: () => setLinkEditing(false), placement: "top" }}
         shouldShow={({ state }) => !state.selection.empty && state.selection.content().size > 0}
       >
+        {linkEditing ? (
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyLink();
+            }}
+          >
+            <input
+              aria-label="Link URL"
+              autoFocus
+              className="h-7 w-64 rounded-md border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+              onChange={(event) => setLinkDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setLinkEditing(false);
+                  editor.commands.focus();
+                }
+              }}
+              placeholder="https://… (empty removes the link)"
+              value={linkDraft}
+            />
+            <button
+              aria-label="Apply link"
+              className="flex size-7 items-center justify-center rounded-md hover:bg-accent"
+              type="submit"
+            >
+              <CheckIcon className="size-4" />
+            </button>
+          </form>
+        ) : null}
         <ToolbarButton
           active={editor.isActive("bold")}
           icon={BoldIcon}
@@ -196,6 +275,12 @@ export const ProseEditor = ({
           icon={CodeIcon}
           label="Inline code"
           onClick={() => editor.chain().focus().toggleCode().run()}
+        />
+        <ToolbarButton
+          active={editor.isActive("link")}
+          icon={LinkIcon}
+          label="Link (⌘K)"
+          onClick={openLinkEditor}
         />
         <span className="mx-1 h-5 w-px bg-border" />
         <ToolbarButton
