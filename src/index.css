@@ -166,8 +166,10 @@
 }
 
 .suggestion-mark {
-  background: var(--tone-0);
-  border-bottom: 2px solid var(--tone-0-strong);
+  --mark-bg: var(--tone-0);
+  --mark-strong: var(--tone-0-strong);
+  background: var(--mark-bg);
+  border-bottom: 2px solid var(--mark-strong);
   border-radius: 2px;
   color: inherit;
   cursor: pointer;
@@ -176,44 +178,27 @@
 }
 
 .suggestion-mark[data-tone="1"] {
-  background: var(--tone-1);
-  border-color: var(--tone-1-strong);
+  --mark-bg: var(--tone-1);
+  --mark-strong: var(--tone-1-strong);
 }
 .suggestion-mark[data-tone="2"] {
-  background: var(--tone-2);
-  border-color: var(--tone-2-strong);
+  --mark-bg: var(--tone-2);
+  --mark-strong: var(--tone-2-strong);
 }
 .suggestion-mark[data-tone="3"] {
-  background: var(--tone-3);
-  border-color: var(--tone-3-strong);
+  --mark-bg: var(--tone-3);
+  --mark-strong: var(--tone-3-strong);
 }
 .suggestion-mark[data-tone="4"] {
-  background: var(--tone-4);
-  border-color: var(--tone-4-strong);
+  --mark-bg: var(--tone-4);
+  --mark-strong: var(--tone-4-strong);
 }
 .suggestion-mark[data-tone="5"] {
-  background: var(--tone-5);
-  border-color: var(--tone-5-strong);
+  --mark-bg: var(--tone-5);
+  --mark-strong: var(--tone-5-strong);
 }
 
-.suggestion-mark.is-active {
-  background: var(--tone-0-strong);
-}
-.suggestion-mark.is-active[data-tone="1"] {
-  background: var(--tone-1-strong);
-}
-.suggestion-mark.is-active[data-tone="2"] {
-  background: var(--tone-2-strong);
-}
-.suggestion-mark.is-active[data-tone="3"] {
-  background: var(--tone-3-strong);
-}
-.suggestion-mark.is-active[data-tone="4"] {
-  background: var(--tone-4-strong);
-}
-.suggestion-mark.is-active[data-tone="5"] {
-  background: var(--tone-5-strong);
-}
+/* Active and hidden states are generated per document; see highlightStyles in App.tsx. */
 
 .commentary-card {
   border-left: 3px solid var(--tone-0-strong);

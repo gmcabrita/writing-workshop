@@ -26,6 +26,7 @@ import {
   requestPersistentStorage,
   saveDocumentContent,
   seedDefaults,
+  setPassHidden,
   setSuggestionStatus,
   updateSuggestionComment,
 } from "@/db/repo";
@@ -107,6 +108,7 @@ const manualPass = (documentId: DocumentId): Pass => ({
   createdAt: 0,
   documentId,
   error: null,
+  hidden: false,
   id: MANUAL_PASS_ID,
   promptName: "Note",
   status: "done",
@@ -118,6 +120,34 @@ const readStoredDocumentId = (): DocumentId | null => {
 
   // SAFETY: this key is only ever written with a DocumentId; a stale id is harmless.
   return stored === null ? null : (stored as DocumentId);
+};
+
+/**
+ * Active and hidden highlight styling is applied through a generated
+ * stylesheet keyed on the marks' data attributes. Toggling classes on the
+ * mark elements does not work: ProseMirror's DOM observer treats foreign
+ * attribute changes as damage and redraws the marks. A transaction would
+ * pollute undo history.
+ */
+const highlightStyles = (
+  activeId: SuggestionId | null,
+  hiddenPassIds: ReadonlySet<string>,
+): string => {
+  const rules: Array<string> = [];
+
+  if (activeId !== null) {
+    rules.push(
+      `.suggestion-mark[data-suggestion-id="${activeId}"] { background: var(--mark-strong); }`,
+    );
+  }
+
+  for (const passId of hiddenPassIds) {
+    rules.push(
+      `.suggestion-mark[data-pass-id="${passId}"] { background: transparent; border-color: transparent; cursor: text; }`,
+    );
+  }
+
+  return rules.join("\n");
 };
 
 /**
@@ -172,25 +202,16 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
   const runner = usePassRunner(editor, doc.id, settings);
 
-  // Mirror the active card onto its highlight. Done on the DOM rather than
-  // through a ProseMirror transaction so it never touches undo history.
-  useEffect(() => {
-    if (editor === null) {
-      return;
-    }
+  const hiddenPassIds = useMemo(
+    () => new Set<string>(passes.filter((pass) => pass.hidden).map((pass) => pass.id)),
+    [passes],
+  );
 
-    const root = editor.view.dom;
-
-    for (const element of root.querySelectorAll(".suggestion-mark.is-active")) {
-      element.classList.remove("is-active");
-    }
-
-    if (activeId !== null) {
-      for (const element of root.querySelectorAll(`[data-suggestion-id="${activeId}"]`)) {
-        element.classList.add("is-active");
-      }
-    }
-  }, [activeId, editor, pmDoc]);
+  /** Notes from passes the writer has not hidden. */
+  const visibleSuggestions = useMemo(
+    () => suggestions.filter((suggestion) => !hiddenPassIds.has(suggestion.passId)),
+    [hiddenPassIds, suggestions],
+  );
 
   /**
    * Suggestions that still have a highlight, in document order. The mark in
@@ -198,8 +219,8 @@ const Workspace = ({ doc }: WorkspaceProps) => {
    * highlight that was accepted or dismissed, and it must show again.
    */
   const orderedSuggestions = useMemo(
-    () => (pmDoc === null ? NO_SUGGESTIONS : sortByDocumentOrder(pmDoc, suggestions)),
-    [pmDoc, suggestions],
+    () => (pmDoc === null ? NO_SUGGESTIONS : sortByDocumentOrder(pmDoc, visibleSuggestions)),
+    [pmDoc, visibleSuggestions],
   );
 
   // Reconcile status with the document: a highlight that came back via undo
@@ -216,10 +237,10 @@ const Workspace = ({ doc }: WorkspaceProps) => {
   const unplaced = useMemo(() => {
     const placedIds = new Set(orderedSuggestions.map((suggestion) => suggestion.id));
 
-    return suggestions.filter(
+    return visibleSuggestions.filter(
       (suggestion) => suggestion.status === "open" && !placedIds.has(suggestion.id),
     );
-  }, [orderedSuggestions, suggestions]);
+  }, [orderedSuggestions, visibleSuggestions]);
 
   const passesById = useMemo(() => {
     const map = new Map<PassId, Pass>(passes.map((pass) => [pass.id, pass]));
@@ -393,6 +414,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
+      <style>{highlightStyles(activeId, hiddenPassIds)}</style>
       <PassToolbar
         activeIndex={activeIndex}
         onDeletePass={(pass) => void removePass(pass)}
@@ -407,6 +429,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         onNext={() => step(1)}
         onOpenRevisions={() => setRevisionsOpen(true)}
         onPrevious={() => step(-1)}
+        onTogglePass={(pass) => void setPassHidden(pass.id, !pass.hidden)}
         openCount={orderedSuggestions.length}
         passes={passes}
         prompts={prompts}

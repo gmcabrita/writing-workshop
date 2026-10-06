@@ -59,6 +59,8 @@ export interface Pass {
   readonly createdAt: number;
   readonly documentId: DocumentId;
   readonly error: string | null;
+  /** Hidden passes keep their notes but show no highlights or cards. */
+  readonly hidden: boolean;
   readonly id: PassId;
   readonly promptName: string;
   readonly status: PassStatus;

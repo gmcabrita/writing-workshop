@@ -47,6 +47,8 @@ const PassSchema = Schema.Struct({
   createdAt: Schema.Number,
   documentId: Schema.String,
   error: Schema.NullOr(Schema.String),
+  // Added after the first release; older backups omit it.
+  hidden: Schema.optional(Schema.Boolean),
   id: Schema.String,
   promptName: Schema.String,
   status: Schema.Literals(["running", "done", "error"]),
@@ -153,6 +155,7 @@ const toDomain = (backup: Backup) => ({
     ...pass,
     // SAFETY: ids were produced by this app's exporter.
     documentId: pass.documentId as DocumentId,
+    hidden: pass.hidden ?? false,
     // SAFETY: ids were produced by this app's exporter.
     id: pass.id as PassId,
   })),

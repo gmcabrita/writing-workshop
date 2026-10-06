@@ -104,6 +104,7 @@ export const createPass = async (documentId: DocumentId, promptName: string): Pr
     createdAt: Date.now(),
     documentId,
     error: null,
+    hidden: false,
     id: newPassId(),
     promptName,
     status: "running",
@@ -117,6 +118,9 @@ export const createPass = async (documentId: DocumentId, promptName: string): Pr
 
 export const finishPass = (id: PassId, status: PassStatus, error: string | null): Promise<number> =>
   db.passes.update(id, { error, status });
+
+export const setPassHidden = (id: PassId, hidden: boolean): Promise<number> =>
+  db.passes.update(id, { hidden });
 
 export const deletePass = (id: PassId): Promise<void> =>
   db.transaction("rw", [db.passes, db.suggestions], async () => {

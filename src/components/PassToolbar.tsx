@@ -2,6 +2,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
   HistoryIcon,
   Loader2Icon,
   PlayIcon,
@@ -19,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import type { Pass, PassPrompt, PassPromptId } from "@/domain/model";
 import type { PassRunner } from "@/hooks/usePassRunner";
+import { cn } from "@/lib/utils";
 
 export interface PassToolbarProps {
   readonly activeIndex: number;
@@ -27,6 +30,7 @@ export interface PassToolbarProps {
   onNext(): void;
   onOpenRevisions(): void;
   onPrevious(): void;
+  onTogglePass(pass: Pass): void;
   readonly openCount: number;
   readonly passes: ReadonlyArray<Pass>;
   readonly prompts: ReadonlyArray<PassPrompt>;
@@ -40,6 +44,7 @@ export const PassToolbar = ({
   onNext,
   onOpenRevisions,
   onPrevious,
+  onTogglePass,
   openCount,
   passes,
   prompts,
@@ -125,12 +130,24 @@ export const PassToolbar = ({
       <div className="flex flex-wrap items-center gap-1">
         {passes.map((pass) => (
           <span
-            className="commentary-tone-badge inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+            className={cn(
+              "commentary-tone-badge inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium",
+              pass.hidden && "opacity-50",
+            )}
             data-tone={pass.tone}
             key={pass.id}
             title={pass.error ?? pass.status}
           >
-            {pass.promptName}
+            <button
+              aria-label={`${pass.hidden ? "Show" : "Hide"} ${pass.promptName} pass`}
+              aria-pressed={!pass.hidden}
+              className="inline-flex items-center gap-1"
+              onClick={() => onTogglePass(pass)}
+              type="button"
+            >
+              {pass.hidden ? <EyeOffIcon className="size-3" /> : <EyeIcon className="size-3" />}
+              {pass.promptName}
+            </button>
             {pass.status === "running" ? <Loader2Icon className="size-3 animate-spin" /> : null}
             {pass.status === "error" ? <span className="text-destructive">!</span> : null}
             <button
