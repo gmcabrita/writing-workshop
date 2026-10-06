@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { addSuggestions, createPass, deletePass, finishPass } from "@/db/repo";
+import { addSuggestions, createPass, createRevision, deletePass, finishPass } from "@/db/repo";
 import type { DocumentId, PassId, PassPrompt, Settings } from "@/domain/model";
 import { buildTextIndex } from "@/domain/textIndex";
 import { applySuggestionMarks } from "@/editor/suggestionActions";
@@ -44,6 +44,9 @@ export const usePassRunner = (
 
         return;
       }
+
+      // A pass is a natural revision boundary: snapshot the text the model saw.
+      await createRevision(documentId, editor.getJSON(), `Before ${prompt.name} pass`, false);
 
       const pass = await createPass(documentId, prompt.name);
       const abort = new AbortController();
