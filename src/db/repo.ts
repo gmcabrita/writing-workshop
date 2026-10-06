@@ -213,6 +213,23 @@ export const failInterruptedPasses = (): Promise<number> =>
     .filter((pass) => pass.status === "running")
     .modify({ error: "Interrupted before it finished. Run it again.", status: "error" });
 
+/**
+ * Ask the browser not to evict this origin's storage under disk pressure.
+ * Chrome grants it silently for engaged sites; Firefox may prompt. Returns
+ * whether storage is now persistent.
+ */
+export const requestPersistentStorage = async (): Promise<boolean> => {
+  if (!("storage" in navigator) || navigator.storage.persist === undefined) {
+    return false;
+  }
+
+  if (await navigator.storage.persisted()) {
+    return true;
+  }
+
+  return navigator.storage.persist();
+};
+
 /** Populate default prompts the first time the app runs and repair leftover state. */
 export const seedDefaults = async (): Promise<void> => {
   const count = await db.passPrompts.count();

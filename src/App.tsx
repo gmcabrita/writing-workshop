@@ -20,6 +20,7 @@ import {
   deleteSuggestion,
   renameDocument,
   reopenSuggestions,
+  requestPersistentStorage,
   saveDocumentContent,
   seedDefaults,
   setSuggestionStatus,
@@ -408,6 +409,7 @@ const App = () => {
 
   useEffect(() => {
     void seedDefaults();
+    void requestPersistentStorage();
   }, []);
 
   useEffect(() => {
