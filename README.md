@@ -17,8 +17,27 @@ pnpm check        # typecheck + format check + lint (anti-slop rules)
 `dist/index.html` inlines all JS, CSS, and fonts. Open it from disk in Chrome
 or Firefox (both verified from `file://`). No CDN or external assets are used.
 
-Remote endpoints need CORS enabled for a `file://` origin (`Access-Control-Allow-Origin: *`).
-Local servers (Ollama, LM Studio, llama.cpp, vLLM) usually allow this by default.
+### CORS
+
+The page is a `file://` origin, so the browser only lets it read responses
+from servers that allow cross-origin requests. The page cannot bypass this.
+Local servers (Ollama, LM Studio, llama.cpp, vLLM) allow it by default.
+
+For a server you control, make it answer the preflight without auth and send:
+
+```
+OPTIONS /v1/chat/completions -> 204
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Authorization, Content-Type
+Access-Control-Allow-Methods: POST, OPTIONS
+```
+
+For a server you cannot change, use a throwaway Chrome profile with web
+security off, and use that window only for this app:
+
+```sh
+open -na "Google Chrome" --args --disable-web-security --user-data-dir=/tmp/ww-chrome
+```
 
 ## How a pass works
 

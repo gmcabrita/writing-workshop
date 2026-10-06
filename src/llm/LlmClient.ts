@@ -41,9 +41,24 @@ interface ChatCompletionRequestBody {
   temperature: number;
 }
 
+/**
+ * A fetch that rejects before any response arrived. Browsers report CORS
+ * rejections and plain network failures with the same opaque TypeError
+ * ("Failed to fetch" / "NetworkError"), so both causes are named.
+ */
+export const BLOCKED_REQUEST_HINT =
+  "The browser blocked the request before it was sent, or the server is unreachable. " +
+  "From a file:// page the server must allow CORS: answer OPTIONS and send " +
+  "Access-Control-Allow-Origin. If you cannot change the server, run Chrome with " +
+  "--disable-web-security in a throwaway profile. Check the browser console for details.";
+
 const describeFetchFailure = (cause: unknown): string => {
   if (cause instanceof DOMException && cause.name === "AbortError") {
     return "Request cancelled.";
+  }
+
+  if (cause instanceof TypeError) {
+    return BLOCKED_REQUEST_HINT;
   }
 
   return cause instanceof Error ? cause.message : "Network request failed.";
