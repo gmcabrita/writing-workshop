@@ -47,6 +47,7 @@ import { ProseEditor } from "@/editor/ProseEditor";
 import {
   acceptSuggestionInEditor,
   dismissSuggestionInEditor,
+  placeSuggestionAtSelection,
   revealSuggestionInEditor,
   sortByDocumentOrder,
 } from "@/editor/suggestionActions";
@@ -211,6 +212,15 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     }
   }, [orderedSuggestions]);
 
+  /** Open notes with no highlight in the document. */
+  const unplaced = useMemo(() => {
+    const placedIds = new Set(orderedSuggestions.map((suggestion) => suggestion.id));
+
+    return suggestions.filter(
+      (suggestion) => suggestion.status === "open" && !placedIds.has(suggestion.id),
+    );
+  }, [orderedSuggestions, suggestions]);
+
   const passesById = useMemo(() => {
     const map = new Map<PassId, Pass>(passes.map((pass) => [pass.id, pass]));
     map.set(MANUAL_PASS_ID, manualPass(doc.id));
@@ -314,6 +324,18 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
     advanceAfterResolve(suggestion);
     await deleteSuggestion(suggestion.id);
+  };
+
+  const place = (suggestion: Suggestion) => {
+    if (editor === null) {
+      return;
+    }
+
+    const tone = passesById.get(suggestion.passId)?.tone ?? 0;
+
+    if (!placeSuggestionAtSelection(editor, suggestion, tone)) {
+      toast.message("Select the passage in the text first.");
+    }
   };
 
   const annotate = async (range: TextRange, quote: string) => {
@@ -426,9 +448,11 @@ const Workspace = ({ doc }: WorkspaceProps) => {
               onCommentChange={(id, comment) => void updateSuggestionComment(id, comment)}
               onDelete={(suggestion) => void remove(suggestion)}
               onDismiss={(suggestion) => void dismiss(suggestion)}
+              onPlace={place}
               onSelect={select}
               passes={passesById}
               suggestions={orderedSuggestions}
+              unplaced={unplaced}
             />
           </div>
         </div>

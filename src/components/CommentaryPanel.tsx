@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { CheckIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CheckIcon, MapPinIcon, Trash2Icon, XIcon } from "lucide-react";
 import {
   type RefObject,
   useCallback,
@@ -35,9 +35,13 @@ export interface CommentaryPanelProps {
   onCommentChange(id: SuggestionId, comment: string): void;
   onDelete(suggestion: Suggestion): void;
   onDismiss(suggestion: Suggestion): void;
+  onPlace(suggestion: Suggestion): void;
   onSelect(id: SuggestionId): void;
   readonly passes: ReadonlyMap<PassId, Pass>;
+  /** Notes with a highlight, in document order. */
   readonly suggestions: ReadonlyArray<Suggestion>;
+  /** Open notes with no highlight: quote not found, or the text was deleted. */
+  readonly unplaced: ReadonlyArray<Suggestion>;
 }
 
 type AnchorMap = ReadonlyMap<SuggestionId, number>;
@@ -70,22 +74,39 @@ const measureAnchors = (
 interface CardActionsProps {
   onAccept(suggestion: Suggestion): void;
   onDismiss(suggestion: Suggestion): void;
+  /** Present for unplaced notes: attach the note to the current selection. */
+  onPlace: ((suggestion: Suggestion) => void) | null;
   readonly suggestion: Suggestion;
 }
 
-const CardActions = ({ onAccept, onDismiss, suggestion }: CardActionsProps) => (
+const CardActions = ({ onAccept, onDismiss, onPlace, suggestion }: CardActionsProps) => (
   <div className="mt-3 flex items-center gap-1.5">
-    <Button
-      onClick={(event) => {
-        event.stopPropagation();
-        onAccept(suggestion);
-      }}
-      size="xs"
-      variant="default"
-    >
-      <CheckIcon />
-      {suggestion.replacement === null ? "Resolve" : "Accept"}
-    </Button>
+    {onPlace === null ? (
+      <Button
+        onClick={(event) => {
+          event.stopPropagation();
+          onAccept(suggestion);
+        }}
+        size="xs"
+        variant="default"
+      >
+        <CheckIcon />
+        {suggestion.replacement === null ? "Resolve" : "Accept"}
+      </Button>
+    ) : (
+      <Button
+        onClick={(event) => {
+          event.stopPropagation();
+          onPlace(suggestion);
+        }}
+        size="xs"
+        title="Select the passage in the text first"
+        variant="default"
+      >
+        <MapPinIcon />
+        Place at selection
+      </Button>
+    )}
     <Button
       onClick={(event) => {
         event.stopPropagation();
@@ -153,10 +174,12 @@ interface CommentaryCardProps {
   onDelete(suggestion: Suggestion): void;
   onDismiss(suggestion: Suggestion): void;
   onMeasure(id: SuggestionId, height: number): void;
+  onPlace: ((suggestion: Suggestion) => void) | null;
   onSelect(id: SuggestionId): void;
   readonly pass: Pass | undefined;
   readonly suggestion: Suggestion;
-  readonly top: number;
+  /** Pixel offset for pinned cards; null renders the card in normal flow. */
+  readonly top: number | null;
 }
 
 const CommentaryCard = ({
@@ -166,6 +189,7 @@ const CommentaryCard = ({
   onDelete,
   onDismiss,
   onMeasure,
+  onPlace,
   onSelect,
   pass,
   suggestion,
@@ -191,14 +215,15 @@ const CommentaryCard = ({
   return (
     <div
       className={cn(
-        "commentary-card absolute right-0 left-0 rounded-lg border bg-card p-3 text-sm shadow-xs transition-[top,box-shadow] duration-200",
+        "commentary-card rounded-lg border bg-card p-3 text-sm shadow-xs transition-[top,box-shadow] duration-200",
+        top === null ? "relative" : "absolute right-0 left-0",
         active ? "z-10 shadow-md" : "cursor-pointer opacity-80 hover:opacity-100",
       )}
       data-active={active}
       data-tone={tone}
       onClick={() => onSelect(suggestion.id)}
       ref={ref}
-      style={{ top }}
+      style={top === null ? undefined : { top }}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span
@@ -227,7 +252,12 @@ const CommentaryCard = ({
         suggestion={suggestion}
       />
       {active ? (
-        <CardActions onAccept={onAccept} onDismiss={onDismiss} suggestion={suggestion} />
+        <CardActions
+          onAccept={onAccept}
+          onDismiss={onDismiss}
+          onPlace={onPlace}
+          suggestion={suggestion}
+        />
       ) : null}
     </div>
   );
@@ -293,9 +323,11 @@ export const CommentaryPanel = ({
   onCommentChange,
   onDelete,
   onDismiss,
+  onPlace,
   onSelect,
   passes,
   suggestions,
+  unplaced,
 }: CommentaryPanelProps) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const anchors = useHighlightAnchors(editor, panelRef, suggestions);
@@ -340,35 +372,64 @@ export const CommentaryPanel = ({
   );
 
   return (
-    <div className="relative" ref={panelRef} style={{ minHeight: panelHeight + CARD_GAP }}>
-      {suggestions.length === 0 ? (
-        <p className="px-1 text-sm text-muted-foreground">
-          No open notes. Run a pass or select text and choose “Annotate”.
-        </p>
+    <>
+      <div className="relative" ref={panelRef} style={{ minHeight: panelHeight + CARD_GAP }}>
+        {suggestions.length === 0 && unplaced.length === 0 ? (
+          <p className="px-1 text-sm text-muted-foreground">
+            No open notes. Run a pass or select text and choose “Annotate”.
+          </p>
+        ) : null}
+        {suggestions.map((suggestion) => {
+          const top = topById.get(suggestion.id);
+
+          if (top === undefined) {
+            return null;
+          }
+
+          return (
+            <CommentaryCard
+              active={suggestion.id === activeId}
+              key={suggestion.id}
+              onAccept={onAccept}
+              onCommentChange={onCommentChange}
+              onDelete={onDelete}
+              onDismiss={onDismiss}
+              onMeasure={onMeasure}
+              onPlace={null}
+              onSelect={onSelect}
+              pass={passes.get(suggestion.passId)}
+              suggestion={suggestion}
+              top={top}
+            />
+          );
+        })}
+      </div>
+      {unplaced.length > 0 ? (
+        <section className="mt-6 flex flex-col gap-2">
+          <h3 className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Unplaced ({unplaced.length})
+          </h3>
+          <p className="px-1 text-xs text-muted-foreground">
+            The quoted text was not found. Select the passage it refers to, then place it.
+          </p>
+          {unplaced.map((suggestion) => (
+            <CommentaryCard
+              active={suggestion.id === activeId}
+              key={suggestion.id}
+              onAccept={onAccept}
+              onCommentChange={onCommentChange}
+              onDelete={onDelete}
+              onDismiss={onDismiss}
+              onMeasure={onMeasure}
+              onPlace={onPlace}
+              onSelect={onSelect}
+              pass={passes.get(suggestion.passId)}
+              suggestion={suggestion}
+              top={null}
+            />
+          ))}
+        </section>
       ) : null}
-      {suggestions.map((suggestion) => {
-        const top = topById.get(suggestion.id);
-
-        if (top === undefined) {
-          return null;
-        }
-
-        return (
-          <CommentaryCard
-            active={suggestion.id === activeId}
-            key={suggestion.id}
-            onAccept={onAccept}
-            onCommentChange={onCommentChange}
-            onDelete={onDelete}
-            onDismiss={onDismiss}
-            onMeasure={onMeasure}
-            onSelect={onSelect}
-            pass={passes.get(suggestion.passId)}
-            suggestion={suggestion}
-            top={top}
-          />
-        );
-      })}
-    </div>
+    </>
   );
 };

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { addSuggestions, createPass, deletePass, finishPass } from "@/db/repo";
 import type { DocumentId, PassId, PassPrompt, Settings } from "@/domain/model";
 import { buildTextIndex } from "@/domain/textIndex";
-import { applySuggestionMarks, partitionAnchorable } from "@/editor/suggestionActions";
+import { applySuggestionMarks } from "@/editor/suggestionActions";
 import { Workshop } from "@/llm/Workshop";
 import { runtime } from "@/runtime";
 
@@ -60,22 +60,24 @@ export const usePassRunner = (
           systemPrompt: settings.systemPrompt,
         });
 
-        const { anchored, unanchored } = partitionAnchorable(editor, drafts);
-        const saved = yield* Effect.promise(() => addSuggestions(documentId, pass.id, anchored));
+        // Every note is kept. Those whose quote cannot be found get no
+        // highlight and appear in the margin as unplaced.
+        const saved = yield* Effect.promise(() => addSuggestions(documentId, pass.id, drafts));
 
-        yield* Effect.sync(() => applySuggestionMarks(editor, pass.id, pass.tone, saved));
+        const placed = yield* Effect.sync(() =>
+          applySuggestionMarks(editor, pass.id, pass.tone, saved),
+        );
+
         yield* Effect.promise(() => finishPass(pass.id, "done", null));
 
-        return { anchored: saved.length, unanchored: unanchored.length };
+        return { placed, unplaced: saved.length - placed };
       }).pipe(
         Effect.tap((outcome) =>
           Effect.sync(() => {
-            const skipped =
-              outcome.unanchored > 0
-                ? ` ${outcome.unanchored} could not be matched to the text.`
-                : "";
+            const unplaced =
+              outcome.unplaced > 0 ? ` ${outcome.unplaced} unplaced (quote not found).` : "";
 
-            toast.success(`${prompt.name}: ${outcome.anchored} notes.${skipped}`);
+            toast.success(`${prompt.name}: ${outcome.placed} notes.${unplaced}`);
           }),
         ),
         Effect.catch((error) =>

@@ -1,53 +1,26 @@
 import type { Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
-import type { SuggestionDraft } from "@/db/repo";
 import type { PassId, Suggestion, SuggestionId } from "@/domain/model";
 import { buildTextIndex, resolveQuoteRange } from "@/domain/textIndex";
 import { findSuggestionRanges } from "@/editor/SuggestionMark";
-
-export interface AnchorResult {
-  readonly anchored: ReadonlyArray<SuggestionDraft>;
-  readonly unanchored: ReadonlyArray<SuggestionDraft>;
-}
-
-/**
- * Split drafts into those whose quote can be found in the document and
- * those that cannot. Pure: does not touch the editor.
- */
-export const partitionAnchorable = (
-  editor: Editor,
-  drafts: ReadonlyArray<SuggestionDraft>,
-): AnchorResult => {
-  const index = buildTextIndex(editor.state.doc);
-  const anchored: Array<SuggestionDraft> = [];
-  const unanchored: Array<SuggestionDraft> = [];
-
-  for (const draft of drafts) {
-    if (resolveQuoteRange(index, draft.quote, 0) === null) {
-      unanchored.push(draft);
-    } else {
-      anchored.push(draft);
-    }
-  }
-
-  return { anchored, unanchored };
-};
 
 /**
  * Highlight each saved suggestion in the editor. Quotes are searched in
  * document order so a repeated phrase attaches to successive occurrences.
  * Applied as one transaction so undo removes the whole pass at once.
+ * Returns how many suggestions were placed.
  */
 export const applySuggestionMarks = (
   editor: Editor,
   passId: PassId,
   tone: number,
   suggestions: ReadonlyArray<Suggestion>,
-): void => {
+): number => {
   const index = buildTextIndex(editor.state.doc);
   let chain = editor.chain();
   let cursor = 0;
+  let placed = 0;
 
   for (const suggestion of suggestions) {
     const range = resolveQuoteRange(index, suggestion.quote, cursor);
@@ -58,9 +31,36 @@ export const applySuggestionMarks = (
 
     chain = chain.addSuggestionMark(range, { id: suggestion.id, passId, tone });
     cursor = Math.max(cursor, range.from);
+    placed += 1;
   }
 
   chain.run();
+
+  return placed;
+};
+
+/**
+ * Attach an unplaced suggestion to the current selection. Returns false when
+ * nothing is selected.
+ */
+export const placeSuggestionAtSelection = (
+  editor: Editor,
+  suggestion: Suggestion,
+  tone: number,
+): boolean => {
+  const { from, to } = editor.state.selection;
+
+  if (from === to) {
+    return false;
+  }
+
+  editor
+    .chain()
+    .addSuggestionMark({ from, to }, { id: suggestion.id, passId: suggestion.passId, tone })
+    .setTextSelection(to)
+    .run();
+
+  return true;
 };
 
 /** Apply the model's replacement text (or just clear the highlight). */
