@@ -7,6 +7,7 @@ import {
   HistoryIcon,
   Loader2Icon,
   PlayIcon,
+  TextSelectIcon,
   XIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -20,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Pass, PassPrompt, PassPromptId } from "@/domain/model";
+import type { TextRange } from "@/domain/textIndex";
 import type { PassRunner } from "@/hooks/usePassRunner";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +37,8 @@ export interface PassToolbarProps {
   readonly passes: ReadonlyArray<Pass>;
   readonly prompts: ReadonlyArray<PassPrompt>;
   readonly runner: PassRunner;
+  /** Current editor selection when it is non-empty; the pass runs on it. */
+  readonly selection: TextRange | null;
 }
 
 export const PassToolbar = ({
@@ -49,6 +53,7 @@ export const PassToolbar = ({
   passes,
   prompts,
   runner,
+  selection,
 }: PassToolbarProps) => {
   const [selectedId, setSelectedId] = useState<PassPromptId | null>(null);
   // Fall back to the first prompt when nothing is chosen or the choice was deleted.
@@ -81,13 +86,18 @@ export const PassToolbar = ({
           disabled={selected === null}
           onClick={() => {
             if (selected !== null) {
-              void runner.run(selected);
+              void runner.run(selected, selection);
             }
           }}
           size="sm"
+          title={
+            selection === null
+              ? "Run on the whole document"
+              : "Run on the selected text only. Clear the selection to run on everything."
+          }
         >
-          <PlayIcon />
-          Run pass
+          {selection === null ? <PlayIcon /> : <TextSelectIcon />}
+          {selection === null ? "Run pass" : "Run on selection"}
         </Button>
       ) : (
         <Button onClick={runner.cancel} size="sm" variant="outline">

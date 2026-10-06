@@ -10,6 +10,8 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
  */
 export interface TextIndex {
   readonly text: string;
+  /** Convert a ProseMirror position into a plain text offset (clamped to text). */
+  toOffset(pos: number): number;
   /** Convert a plain text offset into a ProseMirror position. */
   toPos(offset: number): number;
 }
@@ -60,7 +62,21 @@ export const buildTextIndex = (doc: ProseMirrorNode): TextIndex => {
     return 0;
   };
 
-  return { text, toPos };
+  const toOffset = (pos: number): number => {
+    for (let index = segments.length - 1; index >= 0; index -= 1) {
+      const segment = segments[index];
+
+      if (segment !== undefined && pos >= segment.pos) {
+        const within = Math.min(pos - segment.pos, segment.length);
+
+        return segment.offset + within;
+      }
+    }
+
+    return 0;
+  };
+
+  return { text, toOffset, toPos };
 };
 
 export interface TextRange {
@@ -125,16 +141,23 @@ export const locateQuote = (text: string, quote: string, searchFrom: number): Te
 /**
  * Resolve a quote to a ProseMirror range. Searches from `searchFrom` first so
  * repeated phrases are attached in document order, and falls back to the
- * whole document when the quote only appears earlier.
+ * start of the window when the quote only appears earlier. `window` is a
+ * plain text offset range; matches outside it are rejected.
  */
 export const resolveQuoteRange = (
   index: TextIndex,
   quote: string,
   searchFrom: number,
+  window: TextRange | null = null,
 ): TextRange | null => {
-  const located = locateQuote(index.text, quote, searchFrom) ?? locateQuote(index.text, quote, 0);
+  const windowStart = window?.from ?? 0;
+  const windowEnd = window?.to ?? index.text.length;
 
-  if (located === null) {
+  const located =
+    locateQuote(index.text, quote, Math.max(searchFrom, windowStart)) ??
+    locateQuote(index.text, quote, windowStart);
+
+  if (located === null || located.to > windowEnd) {
     return null;
   }
 

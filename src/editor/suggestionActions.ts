@@ -2,8 +2,15 @@ import type { Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
 import type { PassId, Suggestion, SuggestionId } from "@/domain/model";
-import { buildTextIndex, resolveQuoteRange } from "@/domain/textIndex";
+import { buildTextIndex, resolveQuoteRange, type TextRange } from "@/domain/textIndex";
 import { findSuggestionRanges } from "@/editor/SuggestionMark";
+
+/** Plain text of a document range, with block boundaries as newlines. */
+export const textInRange = (editor: Editor, range: TextRange): string => {
+  const index = buildTextIndex(editor.state.doc);
+
+  return index.text.slice(index.toOffset(range.from), index.toOffset(range.to));
+};
 
 /**
  * Highlight each saved suggestion in the editor. Quotes are searched in
@@ -16,14 +23,20 @@ export const applySuggestionMarks = (
   passId: PassId,
   tone: number,
   suggestions: ReadonlyArray<Suggestion>,
+  /** ProseMirror range the pass ran on; quotes are only matched inside it. */
+  scope: TextRange | null = null,
 ): number => {
   const index = buildTextIndex(editor.state.doc);
+
+  const window =
+    scope === null ? null : { from: index.toOffset(scope.from), to: index.toOffset(scope.to) };
+
   let chain = editor.chain();
   let cursor = 0;
   let placed = 0;
 
   for (const suggestion of suggestions) {
-    const range = resolveQuoteRange(index, suggestion.quote, cursor);
+    const range = resolveQuoteRange(index, suggestion.quote, cursor, window);
 
     if (range === null) {
       continue;

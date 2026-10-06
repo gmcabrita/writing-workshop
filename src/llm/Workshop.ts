@@ -72,6 +72,8 @@ export const parseSuggestions = (
 export interface PassRequest {
   readonly config: LlmConfig;
   readonly documentText: string;
+  /** True when `documentText` is a selection from a longer piece. */
+  readonly excerpt: boolean;
   readonly passPrompt: string;
   readonly systemPrompt: string;
 }
@@ -79,7 +81,9 @@ export interface PassRequest {
 export const buildMessages = (request: PassRequest): ReadonlyArray<ChatMessage> => [
   { content: `${request.systemPrompt.trim()}\n\n${RESPONSE_FORMAT_INSTRUCTIONS}`, role: "system" },
   {
-    content: `## Editing pass\n\n${request.passPrompt}\n\n## Document\n\n${request.documentText}`,
+    content: request.excerpt
+      ? `## Editing pass\n\n${request.passPrompt}\n\n## Excerpt\n\nThe writer selected this excerpt from a longer piece. Comment only on the excerpt; do not assume what surrounds it.\n\n${request.documentText}`
+      : `## Editing pass\n\n${request.passPrompt}\n\n## Document\n\n${request.documentText}`,
     role: "user",
   },
 ];

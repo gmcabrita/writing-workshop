@@ -5,8 +5,8 @@ import { toast } from "sonner";
 
 import { addSuggestions, createPass, createRevision, deletePass, finishPass } from "@/db/repo";
 import type { DocumentId, PassId, PassPrompt, Settings } from "@/domain/model";
-import { buildTextIndex } from "@/domain/textIndex";
-import { applySuggestionMarks } from "@/editor/suggestionActions";
+import { buildTextIndex, type TextRange } from "@/domain/textIndex";
+import { applySuggestionMarks, textInRange } from "@/editor/suggestionActions";
 import { Workshop } from "@/llm/Workshop";
 import { runtime } from "@/runtime";
 
@@ -17,7 +17,8 @@ export interface RunningPass {
 
 export interface PassRunner {
   cancel(): void;
-  run(prompt: PassPrompt): Promise<void>;
+  /** `scope` limits the pass to a document range (the writer's selection). */
+  run(prompt: PassPrompt, scope: TextRange | null): Promise<void>;
   readonly running: RunningPass | null;
 }
 
@@ -34,7 +35,7 @@ export const usePassRunner = (
   const abortRef = useRef<AbortController | null>(null);
 
   const run = useCallback(
-    async (prompt: PassPrompt) => {
+    async (prompt: PassPrompt, scope: TextRange | null) => {
       if (editor === null || documentId === null || running !== null) {
         return;
       }
@@ -58,7 +59,9 @@ export const usePassRunner = (
 
         const drafts = yield* workshop.runPass({
           config: settings.llm,
-          documentText: buildTextIndex(editor.state.doc).text,
+          documentText:
+            scope === null ? buildTextIndex(editor.state.doc).text : textInRange(editor, scope),
+          excerpt: scope !== null,
           passPrompt: prompt.prompt,
           systemPrompt: settings.systemPrompt,
         });
@@ -68,7 +71,7 @@ export const usePassRunner = (
         const saved = yield* Effect.promise(() => addSuggestions(documentId, pass.id, drafts));
 
         const placed = yield* Effect.sync(() =>
-          applySuggestionMarks(editor, pass.id, pass.tone, saved),
+          applySuggestionMarks(editor, pass.id, pass.tone, saved, scope),
         );
 
         yield* Effect.promise(() => finishPass(pass.id, "done", null));

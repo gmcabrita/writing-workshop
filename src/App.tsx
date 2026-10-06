@@ -2,7 +2,7 @@ import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Effect } from "effect";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 import { CommentaryPanel } from "@/components/CommentaryPanel";
@@ -151,6 +151,43 @@ const highlightStyles = (
   return rules.join("\n");
 };
 
+/** Non-empty editor selection as a range, or null. Refreshed on every transaction. */
+const useEditorSelection = (editor: Editor | null): TextRange | null => {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (editor === null) {
+        return () => {};
+      }
+
+      editor.on("transaction", onChange);
+
+      return () => {
+        editor.off("transaction", onChange);
+      };
+    },
+    [editor],
+  );
+
+  // Snapshot must be referentially stable while unchanged, so cache by position.
+  const cache = useRef<TextRange | null>(null);
+
+  return useSyncExternalStore(subscribe, () => {
+    const current = editor?.state.selection;
+
+    if (current === undefined || current.empty) {
+      cache.current = null;
+
+      return null;
+    }
+
+    if (cache.current?.from !== current.from || cache.current.to !== current.to) {
+      cache.current = { from: current.from, to: current.to };
+    }
+
+    return cache.current;
+  });
+};
+
 /**
  * Latest ProseMirror document, refreshed on every transaction so derived
  * data (note order, active highlight) follows edits.
@@ -186,6 +223,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [activeId, setActiveId] = useState<SuggestionId | null>(null);
   const pmDoc = useEditorDoc(editor);
+  const selection = useEditorSelection(editor);
   const [revisionsOpen, setRevisionsOpen] = useState(false);
 
   const settings = useLiveQuery(() => db.settings.get("settings"), []) ?? DEFAULT_SETTINGS;
@@ -459,6 +497,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         passes={passes}
         prompts={prompts}
         runner={runner}
+        selection={selection}
       />
 
       <div className="flex-1 overflow-y-auto">
