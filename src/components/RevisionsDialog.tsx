@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import { useLiveQuery } from "dexie-react-hooks";
-import { FlagIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
+import { FlagIcon, GitCompareIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { db } from "@/db/database";
 import { createRevision, deleteRevision, setRevisionMajor } from "@/db/repo";
-import type { DocumentId, Revision } from "@/domain/model";
+import type { DocumentId, Revision, RevisionId } from "@/domain/model";
+import { RevisionCompare } from "@/components/RevisionCompare";
 import { cn } from "@/lib/utils";
 
 export interface RevisionsDialogProps {
@@ -38,15 +39,20 @@ const formatTimestamp = (value: number): string =>
   });
 
 const RevisionRow = ({
+  comparing,
+  onCompare,
   onRestore,
   revision,
 }: {
+  readonly comparing: boolean;
+  onCompare(revision: Revision): void;
   onRestore(revision: Revision): void;
   readonly revision: Revision;
 }) => (
   <li
     className={cn(
       "flex items-center gap-3 rounded-md border px-3 py-2",
+      comparing && "ring-2 ring-ring/40",
       revision.major &&
         "border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-950/30",
     )}
@@ -73,6 +79,15 @@ const RevisionRow = ({
       </div>
       <div className="text-xs text-muted-foreground">{formatTimestamp(revision.createdAt)}</div>
     </div>
+    <Button
+      aria-pressed={comparing}
+      onClick={() => onCompare(revision)}
+      size="sm"
+      variant={comparing ? "secondary" : "ghost"}
+    >
+      <GitCompareIcon />
+      Compare
+    </Button>
     <Button onClick={() => onRestore(revision)} size="sm" variant="outline">
       <RotateCcwIcon />
       Restore
@@ -103,6 +118,8 @@ export const RevisionsDialog = ({
 
   const [label, setLabel] = useState("");
   const [major, setMajor] = useState(false);
+  const [comparingId, setComparingId] = useState<RevisionId | null>(null);
+  const comparing = revisions.find((revision) => revision.id === comparingId) ?? null;
 
   const snapshot = async () => {
     await createRevision(documentId, currentContent(), label.trim(), major);
@@ -112,7 +129,7 @@ export const RevisionsDialog = ({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Revisions</DialogTitle>
           <DialogDescription>
@@ -148,9 +165,23 @@ export const RevisionsDialog = ({
         ) : (
           <ul className="flex flex-col gap-2">
             {revisions.map((revision) => (
-              <RevisionRow key={revision.id} onRestore={onRestore} revision={revision} />
+              <RevisionRow
+                comparing={revision.id === comparingId}
+                key={revision.id}
+                onCompare={(target) => setComparingId(target.id === comparingId ? null : target.id)}
+                onRestore={onRestore}
+                revision={revision}
+              />
             ))}
           </ul>
+        )}
+        {comparing === null ? null : (
+          <RevisionCompare
+            currentContent={currentContent}
+            key={comparing.id}
+            revisions={revisions}
+            selected={comparing}
+          />
         )}
       </DialogContent>
     </Dialog>

@@ -28,6 +28,7 @@
     "cn": "^0.4.0",
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^4.4.0",
+    "diff": "^9.0.0",
     "effect": "^4.0.1",
     "lucide-react": "^1.52.0",
     "radix-ui": "^1.7.0",
