@@ -3,7 +3,14 @@ import { Effect } from "effect";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { addSuggestions, createPass, createRevision, deletePass, finishPass } from "@/db/repo";
+import {
+  addSuggestions,
+  createPass,
+  createRevision,
+  deletePass,
+  finishPass,
+  loadPriorNotes,
+} from "@/db/repo";
 import type { DocumentId, PassId, PassPrompt, Settings } from "@/domain/model";
 import { buildTextIndex, type TextRange } from "@/domain/textIndex";
 import { applySuggestionMarks, textInRange } from "@/editor/suggestionActions";
@@ -57,12 +64,15 @@ export const usePassRunner = (
       const program = Effect.gen(function* () {
         const workshop = yield* Workshop;
 
+        const priorNotes = yield* Effect.promise(() => loadPriorNotes(documentId));
+
         const drafts = yield* workshop.runPass({
           config: settings.llm,
           documentText:
             scope === null ? buildTextIndex(editor.state.doc).text : textInRange(editor, scope),
           excerpt: scope !== null,
           passPrompt: prompt.prompt,
+          priorNotes,
           systemPrompt: settings.systemPrompt,
         });
 

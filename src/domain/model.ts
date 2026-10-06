@@ -85,6 +85,13 @@ export interface Suggestion {
   readonly status: SuggestionStatus;
 }
 
+/** A note from an earlier pass, summarised for the model as context. */
+export interface PriorNote {
+  readonly comment: string;
+  readonly quote: string;
+  readonly status: SuggestionStatus;
+}
+
 /** A named, pass-specific prompt the writer can pick when running a pass. */
 export interface PassPrompt {
   readonly id: PassPromptId;

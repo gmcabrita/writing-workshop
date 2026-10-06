@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 import type { SuggestionDraft } from "@/db/repo";
-import { type LlmConfig, RESPONSE_FORMAT_INSTRUCTIONS } from "@/domain/model";
+import { type LlmConfig, type PriorNote, RESPONSE_FORMAT_INSTRUCTIONS } from "@/domain/model";
 import { type ChatMessage, LlmClient, type LlmError } from "@/llm/LlmClient";
 
 export class WorkshopParseError extends Schema.TaggedError<WorkshopParseError>()(
@@ -69,21 +69,56 @@ export const parseSuggestions = (
     ),
   );
 
+/** Cap on prior notes sent, newest first, to bound prompt size. */
+export const MAX_PRIOR_NOTES = 40;
+
 export interface PassRequest {
   readonly config: LlmConfig;
   readonly documentText: string;
   /** True when `documentText` is a selection from a longer piece. */
   readonly excerpt: boolean;
   readonly passPrompt: string;
+  /** Notes from earlier passes on this document, newest first. */
+  readonly priorNotes: ReadonlyArray<PriorNote>;
   readonly systemPrompt: string;
 }
+
+const truncate = (value: string, max: number): string =>
+  value.length > max ? `${value.slice(0, max - 1)}…` : value;
+
+const STATUS_NOTE: Record<PriorNote["status"], string> = {
+  accepted: "accepted and applied",
+  dismissed: "declined by the writer; do not raise again",
+  open: "still open",
+};
+
+/**
+ * Earlier notes let the model skip what is already covered. Omitted when
+ * there is nothing to report.
+ */
+const priorNotesSection = (notes: ReadonlyArray<PriorNote>): string => {
+  if (notes.length === 0) {
+    return "";
+  }
+
+  const lines = notes
+    .slice(0, MAX_PRIOR_NOTES)
+    .map(
+      (note) =>
+        `- [${STATUS_NOTE[note.status]}] "${truncate(note.quote, 80)}": ${truncate(note.comment, 160)}`,
+    );
+
+  return `\n\n## Earlier notes on this document\n\nDo not repeat these. Declined notes mean the writer disagrees; drop the point.\n\n${lines.join("\n")}`;
+};
 
 export const buildMessages = (request: PassRequest): ReadonlyArray<ChatMessage> => [
   { content: `${request.systemPrompt.trim()}\n\n${RESPONSE_FORMAT_INSTRUCTIONS}`, role: "system" },
   {
-    content: request.excerpt
-      ? `## Editing pass\n\n${request.passPrompt}\n\n## Excerpt\n\nThe writer selected this excerpt from a longer piece. Comment only on the excerpt; do not assume what surrounds it.\n\n${request.documentText}`
-      : `## Editing pass\n\n${request.passPrompt}\n\n## Document\n\n${request.documentText}`,
+    content:
+      (request.excerpt
+        ? `## Editing pass\n\n${request.passPrompt}\n\n## Excerpt\n\nThe writer selected this excerpt from a longer piece. Comment only on the excerpt; do not assume what surrounds it.\n\n${request.documentText}`
+        : `## Editing pass\n\n${request.passPrompt}\n\n## Document\n\n${request.documentText}`) +
+      priorNotesSection(request.priorNotes),
     role: "user",
   },
 ];

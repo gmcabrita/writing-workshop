@@ -17,6 +17,7 @@ import {
   type PassPrompt,
   type PassPromptId,
   type PassStatus,
+  type PriorNote,
   type Revision,
   type RevisionId,
   type Settings,
@@ -160,6 +161,19 @@ export const addSuggestions = async (
 
 export const setSuggestionStatus = (id: SuggestionId, status: SuggestionStatus): Promise<number> =>
   db.suggestions.update(id, { status });
+
+/** Earlier notes on a document, newest first, as context for the next pass. */
+export const loadPriorNotes = async (documentId: DocumentId): Promise<ReadonlyArray<PriorNote>> => {
+  const rows = await db.suggestions
+    .where("documentId")
+    .equals(documentId)
+    .reverse()
+    .sortBy("createdAt");
+
+  return rows
+    .filter((row) => row.comment.trim().length > 0)
+    .map((row): PriorNote => ({ comment: row.comment, quote: row.quote, status: row.status }));
+};
 
 export const reopenSuggestions = (ids: ReadonlyArray<SuggestionId>): Promise<number> =>
   db.suggestions
