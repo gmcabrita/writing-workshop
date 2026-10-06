@@ -15,7 +15,7 @@ import {
 import { useEffect, useRef } from "react";
 
 import { SlashCommand } from "@/editor/SlashCommand";
-import { SuggestionMark, suggestionIdAt } from "@/editor/SuggestionMark";
+import { SuggestionMark, suggestionIdsAt } from "@/editor/SuggestionMark";
 import type { SuggestionId } from "@/domain/model";
 import type { TextRange } from "@/domain/textIndex";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,8 @@ export interface ProseEditorProps {
   onAnnotate(range: TextRange, quote: string): void;
   onChange(content: JSONContent): void;
   onReady(editor: Editor | null): void;
-  onSuggestionClick(id: SuggestionId): void;
+  /** Highlights under the click, shortest span first. */
+  onSuggestionClick(ids: ReadonlyArray<SuggestionId>): void;
 }
 
 interface ToolbarButtonProps {
@@ -71,6 +72,13 @@ export const ProseEditor = ({
   onSuggestionClick,
 }: ProseEditorProps) => {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // editorProps are captured once when the editor is created, so the click
+  // handler reads the latest callback through a ref.
+  const suggestionClickRef = useRef(onSuggestionClick);
+
+  useEffect(() => {
+    suggestionClickRef.current = onSuggestionClick;
+  }, [onSuggestionClick]);
 
   const editor = useEditor({
     content: initialContent,
@@ -79,14 +87,25 @@ export const ProseEditor = ({
         class: "prose-editor focus:outline-none",
         spellcheck: "true",
       },
-      handleClick: (view, pos) => {
-        const id = suggestionIdAt(view.state.doc, pos);
+      // A raw DOM listener rather than handleClick: ProseMirror skips
+      // handleClick when the click does not move the selection, which is
+      // exactly the repeated click used to cycle through stacked highlights.
+      handleDOMEvents: {
+        click: (view, event) => {
+          const hit = view.posAtCoords({ left: event.clientX, top: event.clientY });
 
-        if (id !== null) {
-          onSuggestionClick(id);
-        }
+          if (hit === null) {
+            return false;
+          }
 
-        return false;
+          const ids = suggestionIdsAt(view.state.doc, hit.pos);
+
+          if (ids.length > 0) {
+            suggestionClickRef.current(ids);
+          }
+
+          return false;
+        },
       },
     },
     extensions: [

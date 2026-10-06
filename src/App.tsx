@@ -194,6 +194,19 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     [editor],
   );
 
+  /** Clicking a stack of overlapping highlights cycles through them. */
+  const selectFromClick = useCallback(
+    (ids: ReadonlyArray<SuggestionId>) => {
+      const current = activeId === null ? -1 : ids.indexOf(activeId);
+      const next = ids[(current + 1) % ids.length];
+
+      if (next !== undefined) {
+        select(next);
+      }
+    },
+    [activeId, select],
+  );
+
   const step = useCallback(
     (delta: number) => {
       if (orderedSuggestions.length === 0) {
@@ -357,7 +370,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
               onAnnotate={(range, quote) => void annotate(range, quote)}
               onChange={persist}
               onReady={setEditor}
-              onSuggestionClick={select}
+              onSuggestionClick={selectFromClick}
             />
           </div>
           <div className="w-80 shrink-0">

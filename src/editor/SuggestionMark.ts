@@ -60,17 +60,25 @@ export const findSuggestionRanges = (doc: ProseMirrorNode, id: SuggestionId): Ar
   return ranges;
 };
 
-/** Suggestion id of the highlight under `pos`, or null when the position is unmarked. */
-export const suggestionIdAt = (doc: ProseMirrorNode, pos: number): SuggestionId | null => {
+const spanLength = (doc: ProseMirrorNode, id: SuggestionId): number =>
+  findSuggestionRanges(doc, id).reduce((total, range) => total + (range.to - range.from), 0);
+
+/**
+ * Ids of every highlight under `pos`, shortest span first. Overlapping
+ * passes nest their marks, so a click lands on several at once; the
+ * shortest is the most specific and the caller may cycle through the rest.
+ */
+export const suggestionIdsAt = (doc: ProseMirrorNode, pos: number): ReadonlyArray<SuggestionId> => {
   const marks = doc.nodeAt(pos)?.marks ?? doc.resolve(pos).marks();
-  const mark = marks.find((candidate) => candidate.type.name === SUGGESTION_MARK_NAME);
 
-  if (mark === undefined || !Predicate.isString(mark.attrs.id)) {
-    return null;
-  }
+  const ids = marks.flatMap((mark) =>
+    mark.type.name === SUGGESTION_MARK_NAME && Predicate.isString(mark.attrs.id)
+      ? // SAFETY: the mark's `id` attribute is only ever written from a SuggestionId.
+        [mark.attrs.id as SuggestionId]
+      : [],
+  );
 
-  // SAFETY: the mark's `id` attribute is only ever written from a SuggestionId.
-  return mark.attrs.id as SuggestionId;
+  return ids.toSorted((a, b) => spanLength(doc, a) - spanLength(doc, b));
 };
 
 /** Ids of every suggestion that still has a highlight in the document. */
