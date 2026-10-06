@@ -91,6 +91,7 @@ const CardActions = ({ onAccept, onDismiss, onPlace, suggestion }: CardActionsPr
           onAccept(suggestion);
         }}
         size="xs"
+        title="Alt+Enter"
         variant="default"
       >
         <CheckIcon />
@@ -116,6 +117,7 @@ const CardActions = ({ onAccept, onDismiss, onPlace, suggestion }: CardActionsPr
         onDismiss(suggestion);
       }}
       size="xs"
+      title="Alt+Backspace"
       variant="ghost"
     >
       <XIcon />

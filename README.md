@@ -92,3 +92,4 @@ erDiagram
 - `/` in the editor: block menu.
 - Select text: formatting bubble, plus "Annotate selection" for a manual note.
 - `Alt+↓` / `Alt+↑` (or `Alt+J` / `Alt+K`): next / previous note.
+- `Alt+Enter`: accept the active note. `Alt+Backspace`: dismiss it.

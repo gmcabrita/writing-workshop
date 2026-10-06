@@ -115,7 +115,7 @@ export const PassToolbar = ({
           disabled={!hasOpen}
           onClick={onPrevious}
           size="icon-sm"
-          title="Previous note (Alt+↑)"
+          title="Previous note (Alt+↑ / Alt+K)"
           variant="ghost"
         >
           <ChevronUpIcon />
@@ -128,7 +128,7 @@ export const PassToolbar = ({
           disabled={!hasOpen}
           onClick={onNext}
           size="icon-sm"
-          title="Next note (Alt+↓)"
+          title="Next note (Alt+↓ / Alt+J)"
           variant="ghost"
         >
           <ChevronDownIcon />

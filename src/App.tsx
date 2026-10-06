@@ -340,51 +340,40 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     [activeIndex, orderedSuggestions, select],
   );
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.altKey) {
+  const advanceAfterResolve = useCallback(
+    (resolvedNote: Suggestion) => {
+      const index = orderedSuggestions.findIndex((suggestion) => suggestion.id === resolvedNote.id);
+      const next = orderedSuggestions[index + 1] ?? orderedSuggestions[index - 1] ?? null;
+      setActiveId(next === null ? null : next.id);
+    },
+    [orderedSuggestions],
+  );
+
+  const accept = useCallback(
+    async (suggestion: Suggestion) => {
+      if (editor === null) {
         return;
       }
 
-      if (event.key === "ArrowDown" || event.key === "j") {
-        event.preventDefault();
-        step(1);
-      } else if (event.key === "ArrowUp" || event.key === "k") {
-        event.preventDefault();
-        step(-1);
+      acceptSuggestionInEditor(editor, suggestion);
+      advanceAfterResolve(suggestion);
+      await setSuggestionStatus(suggestion.id, "accepted");
+    },
+    [advanceAfterResolve, editor],
+  );
+
+  const dismiss = useCallback(
+    async (suggestion: Suggestion) => {
+      if (editor === null) {
+        return;
       }
-    };
 
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [step]);
-
-  const advanceAfterResolve = (resolved: Suggestion) => {
-    const index = orderedSuggestions.findIndex((suggestion) => suggestion.id === resolved.id);
-    const next = orderedSuggestions[index + 1] ?? orderedSuggestions[index - 1] ?? null;
-    setActiveId(next === null ? null : next.id);
-  };
-
-  const accept = async (suggestion: Suggestion) => {
-    if (editor === null) {
-      return;
-    }
-
-    acceptSuggestionInEditor(editor, suggestion);
-    advanceAfterResolve(suggestion);
-    await setSuggestionStatus(suggestion.id, "accepted");
-  };
-
-  const dismiss = async (suggestion: Suggestion) => {
-    if (editor === null) {
-      return;
-    }
-
-    dismissSuggestionInEditor(editor, suggestion.id);
-    advanceAfterResolve(suggestion);
-    await setSuggestionStatus(suggestion.id, "dismissed");
-  };
+      dismissSuggestionInEditor(editor, suggestion.id);
+      advanceAfterResolve(suggestion);
+      await setSuggestionStatus(suggestion.id, "dismissed");
+    },
+    [advanceAfterResolve, editor],
+  );
 
   const remove = async (suggestion: Suggestion) => {
     if (editor !== null) {
@@ -394,6 +383,44 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     advanceAfterResolve(suggestion);
     await deleteSuggestion(suggestion.id);
   };
+
+  const activeSuggestion = orderedSuggestions[activeIndex] ?? null;
+
+  // Alt+↓/↑ (or Alt+J/K) step; Alt+Enter accepts; Alt+Backspace dismisses.
+  // Handlers are read through a ref so the listener is attached once.
+  const keyActions = useRef({ accept, activeSuggestion, dismiss, step });
+
+  useEffect(() => {
+    keyActions.current = { accept, activeSuggestion, dismiss, step };
+  }, [accept, activeSuggestion, dismiss, step]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey) {
+        return;
+      }
+
+      const actions = keyActions.current;
+
+      if (event.key === "ArrowDown" || event.key === "j") {
+        event.preventDefault();
+        actions.step(1);
+      } else if (event.key === "ArrowUp" || event.key === "k") {
+        event.preventDefault();
+        actions.step(-1);
+      } else if (event.key === "Enter" && actions.activeSuggestion !== null) {
+        event.preventDefault();
+        void actions.accept(actions.activeSuggestion);
+      } else if (event.key === "Backspace" && actions.activeSuggestion !== null) {
+        event.preventDefault();
+        void actions.dismiss(actions.activeSuggestion);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   /**
    * Bring a resolved note back. If its quote is still in the text the
