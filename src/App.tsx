@@ -42,7 +42,8 @@ import {
   type SuggestionId,
   type WorkshopDocument,
 } from "@/domain/model";
-import type { TextRange } from "@/domain/textIndex";
+import { buildTextIndex, type TextRange } from "@/domain/textIndex";
+import { formatStats, textStats } from "@/domain/wordCount";
 import { contentToMarkdown, markdownToContent } from "@/editor/markdown";
 import { ProseEditor } from "@/editor/ProseEditor";
 import {
@@ -240,6 +241,21 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     NO_SUGGESTIONS;
 
   const runner = usePassRunner(editor, doc.id, settings);
+
+  const statsLabel = useMemo(() => {
+    if (pmDoc === null) {
+      return "";
+    }
+
+    const index = buildTextIndex(pmDoc);
+
+    const text =
+      selection === null
+        ? index.text
+        : index.text.slice(index.toOffset(selection.from), index.toOffset(selection.to));
+
+    return formatStats(textStats(text));
+  }, [pmDoc, selection]);
 
   const hiddenPassIds = useMemo(
     () => new Set<string>(passes.filter((pass) => pass.hidden).map((pass) => pass.id)),
@@ -525,6 +541,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         prompts={prompts}
         runner={runner}
         selection={selection}
+        statsLabel={statsLabel}
       />
 
       <div className="flex-1 overflow-y-auto">

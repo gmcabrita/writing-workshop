@@ -39,6 +39,8 @@ export interface PassToolbarProps {
   readonly runner: PassRunner;
   /** Current editor selection when it is non-empty; the pass runs on it. */
   readonly selection: TextRange | null;
+  /** Word count label for the document (or the selection when one exists). */
+  readonly statsLabel: string;
 }
 
 export const PassToolbar = ({
@@ -54,6 +56,7 @@ export const PassToolbar = ({
   prompts,
   runner,
   selection,
+  statsLabel,
 }: PassToolbarProps) => {
   const [selectedId, setSelectedId] = useState<PassPromptId | null>(null);
   // Fall back to the first prompt when nothing is chosen or the choice was deleted.
@@ -173,6 +176,12 @@ export const PassToolbar = ({
       </div>
 
       <div className="ml-auto flex items-center gap-1">
+        <span
+          className="px-2 text-xs tabular-nums text-muted-foreground"
+          title={selection === null ? "Whole document" : "Selected text"}
+        >
+          {statsLabel}
+        </span>
         <Button onClick={onExportMarkdown} size="sm" title="Download as Markdown" variant="ghost">
           <DownloadIcon />
           Export
