@@ -204,11 +204,22 @@ export const restoreDefaultPassPrompts = (): Promise<void> =>
     );
   });
 
-/** Populate default prompts the first time the app runs. */
+/**
+ * A pass only runs while its tab is open. Any pass still marked running at
+ * startup was cut off by a reload or crash.
+ */
+export const failInterruptedPasses = (): Promise<number> =>
+  db.passes
+    .filter((pass) => pass.status === "running")
+    .modify({ error: "Interrupted before it finished. Run it again.", status: "error" });
+
+/** Populate default prompts the first time the app runs and repair leftover state. */
 export const seedDefaults = async (): Promise<void> => {
   const count = await db.passPrompts.count();
 
   if (count === 0) {
     await restoreDefaultPassPrompts();
   }
+
+  await failInterruptedPasses();
 };
