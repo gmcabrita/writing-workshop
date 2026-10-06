@@ -47,6 +47,7 @@ import { contentToMarkdown, markdownToContent } from "@/editor/markdown";
 import { ProseEditor } from "@/editor/ProseEditor";
 import {
   acceptSuggestionInEditor,
+  applySuggestionMarks,
   dismissSuggestionInEditor,
   placeSuggestionAtSelection,
   revealSuggestionInEditor,
@@ -242,6 +243,15 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     );
   }, [orderedSuggestions, visibleSuggestions]);
 
+  /** Accepted or dismissed notes whose highlight is gone, newest first. */
+  const resolved = useMemo(() => {
+    const placedIds = new Set(orderedSuggestions.map((suggestion) => suggestion.id));
+
+    return visibleSuggestions
+      .filter((suggestion) => suggestion.status !== "open" && !placedIds.has(suggestion.id))
+      .toSorted((a, b) => b.createdAt - a.createdAt);
+  }, [orderedSuggestions, visibleSuggestions]);
+
   const passesById = useMemo(() => {
     const map = new Map<PassId, Pass>(passes.map((pass) => [pass.id, pass]));
     map.set(MANUAL_PASS_ID, manualPass(doc.id));
@@ -345,6 +355,21 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
     advanceAfterResolve(suggestion);
     await deleteSuggestion(suggestion.id);
+  };
+
+  /**
+   * Bring a resolved note back. If its quote is still in the text the
+   * highlight is restored; otherwise it lands in Unplaced.
+   */
+  const reopen = async (suggestion: Suggestion) => {
+    await reopenSuggestions([suggestion.id]);
+
+    if (editor !== null) {
+      const tone = passesById.get(suggestion.passId)?.tone ?? 0;
+      applySuggestionMarks(editor, suggestion.passId, tone, [suggestion]);
+    }
+
+    setActiveId(suggestion.id);
   };
 
   const place = (suggestion: Suggestion) => {
@@ -472,8 +497,10 @@ const Workspace = ({ doc }: WorkspaceProps) => {
               onDelete={(suggestion) => void remove(suggestion)}
               onDismiss={(suggestion) => void dismiss(suggestion)}
               onPlace={place}
+              onReopen={(suggestion) => void reopen(suggestion)}
               onSelect={select}
               passes={passesById}
+              resolved={resolved}
               suggestions={orderedSuggestions}
               unplaced={unplaced}
             />

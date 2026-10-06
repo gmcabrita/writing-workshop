@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { CheckIcon, MapPinIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CheckIcon, MapPinIcon, RotateCcwIcon, Trash2Icon, XIcon } from "lucide-react";
 import {
   type RefObject,
   useCallback,
@@ -36,8 +36,11 @@ export interface CommentaryPanelProps {
   onDelete(suggestion: Suggestion): void;
   onDismiss(suggestion: Suggestion): void;
   onPlace(suggestion: Suggestion): void;
+  onReopen(suggestion: Suggestion): void;
   onSelect(id: SuggestionId): void;
   readonly passes: ReadonlyMap<PassId, Pass>;
+  /** Accepted or dismissed notes, newest first. */
+  readonly resolved: ReadonlyArray<Suggestion>;
   /** Notes with a highlight, in document order. */
   readonly suggestions: ReadonlyArray<Suggestion>;
   /** Open notes with no highlight: quote not found, or the text was deleted. */
@@ -263,6 +266,56 @@ const CommentaryCard = ({
   );
 };
 
+interface ResolvedListProps {
+  onReopen(suggestion: Suggestion): void;
+  readonly passes: ReadonlyMap<PassId, Pass>;
+  readonly resolved: ReadonlyArray<Suggestion>;
+}
+
+/** Collapsed history of notes the writer has accepted or dismissed. */
+const ResolvedList = ({ onReopen, passes, resolved }: ResolvedListProps) => (
+  <details className="mt-6">
+    <summary className="cursor-pointer px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase select-none">
+      Resolved ({resolved.length})
+    </summary>
+    <ul className="mt-2 flex flex-col gap-1.5">
+      {resolved.map((suggestion) => {
+        const pass = passes.get(suggestion.passId);
+
+        return (
+          <li
+            className="commentary-card rounded-lg border bg-card/60 p-2.5 text-xs"
+            data-tone={pass?.tone ?? 0}
+            key={suggestion.id}
+          >
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="commentary-tone-badge rounded px-1.5 py-0.5 text-[11px] font-medium"
+                  data-tone={pass?.tone ?? 0}
+                >
+                  {suggestion.passId === MANUAL_PASS_ID ? "Note" : (pass?.promptName ?? "Pass")}
+                </span>
+                <span className="text-muted-foreground">
+                  {suggestion.status === "accepted" ? "Accepted" : "Dismissed"}
+                </span>
+              </span>
+              <Button onClick={() => onReopen(suggestion)} size="xs" variant="ghost">
+                <RotateCcwIcon />
+                Reopen
+              </Button>
+            </div>
+            <blockquote className="mb-1 truncate border-l-2 pl-2 text-muted-foreground italic">
+              {suggestion.quote}
+            </blockquote>
+            <p className="line-clamp-2 leading-snug">{suggestion.comment}</p>
+          </li>
+        );
+      })}
+    </ul>
+  </details>
+);
+
 /**
  * Keeps `anchors` in sync with where highlights are drawn. Measurement is
  * scheduled on an animation frame so layout has settled after each change.
@@ -324,8 +377,10 @@ export const CommentaryPanel = ({
   onDelete,
   onDismiss,
   onPlace,
+  onReopen,
   onSelect,
   passes,
+  resolved,
   suggestions,
   unplaced,
 }: CommentaryPanelProps) => {
@@ -429,6 +484,9 @@ export const CommentaryPanel = ({
             />
           ))}
         </section>
+      ) : null}
+      {resolved.length > 0 ? (
+        <ResolvedList onReopen={onReopen} passes={passes} resolved={resolved} />
       ) : null}
     </>
   );
