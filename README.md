@@ -54,7 +54,8 @@ sequenceDiagram
     W->>UI: choose pass prompt, Run
     UI->>R: run(prompt)
     R->>DB: createPass(running)
-    R->>WS: runPass(system + pass prompt + plain text)
+    R->>DB: loadPriorNotes, loadContextFiles
+    R->>WS: runPass(document subject) and runPass(lead subject), together
     WS->>LLM: POST /chat/completions
     LLM-->>WS: JSON notes [{quote, comment, replacement}]
     WS-->>R: parsed drafts (Schema-validated)
@@ -70,22 +71,50 @@ moves with the text as the writer edits. The margin card is positioned from
 the highlight's rendered position; cards are pushed apart so they never
 overlap, and the active card stays pinned to its highlight.
 
+## Lead and context
+
+Under the title sits the lead: a short summary or hook shown outside the
+piece (200 characters by default; Settings → Writing). It is not part of the
+prose. A whole-document pass sends two requests: one on the document (lead
+as context) and one on the lead alone (document as context). Lead notes
+appear in a Lead group at the top of the margin; accepting a typo fix edits
+the lead field. Passes run on a selection leave the lead out.
+
+"Context" in the toolbar attaches reference material to the document:
+earnings reports, meeting notes, sources. Files are converted to text at
+import and stored in IndexedDB; every pass sends them in full as background.
+Pasted text is stored the same way and can be edited later.
+
+```mermaid
+flowchart LR
+    pick["Add files… / Add text"] --> kind{kind by extension, then MIME}
+    kind -->|pdf| pdf["pdf.js text runs, in-process worker"]
+    kind -->|html| html["article/main → editor schema → Markdown"]
+    kind -->|md, txt, other| raw["read as text, reject NUL bytes"]
+    pdf --> store[(contextFiles)]
+    html --> store
+    raw --> store
+    store --> prompt["Reference material section of the pass request"]
+```
+
 ## Data model
 
 ```mermaid
 erDiagram
     DOCUMENT ||--o{ REVISION : snapshots
     DOCUMENT ||--o{ PASS : runs
+    DOCUMENT ||--o{ CONTEXT_FILE : attaches
     PASS ||--o{ SUGGESTION : produces
     PASS_PROMPT }o..o{ PASS : "named by"
     SETTINGS ||--|| LLM_CONFIG : holds
 
-    DOCUMENT { string id  string title  json content }
+    DOCUMENT { string id  string title  string lead  json content }
     REVISION { string id  string label  bool major  json content }
     PASS { string id  string promptName  int tone  string status }
-    SUGGESTION { string id  string quote  string comment  string replacement  string status }
+    SUGGESTION { string id  string target  string quote  string comment  string replacement  string status }
+    CONTEXT_FILE { string id  string name  string kind  string text }
     PASS_PROMPT { string id  string name  string prompt }
-    SETTINGS { string systemPrompt }
+    SETTINGS { string systemPrompt  int leadMaxLength }
 ```
 
 ## Layout
@@ -100,7 +129,8 @@ erDiagram
 ## Data safety
 
 - Sidebar → "Back up everything" downloads a JSON file with all documents,
-  revisions, passes, notes, prompts, and settings (API key excluded).
+  revisions, passes, notes, context files, prompts, and settings (API key
+  excluded).
 - "Restore backup…" merges a backup file by id; importing twice is harmless.
 - "Import Markdown…" creates a document from a `.md` file. "Export" in the
   toolbar downloads the current document as Markdown (highlights are dropped).

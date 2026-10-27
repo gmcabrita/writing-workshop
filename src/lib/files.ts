@@ -39,6 +39,23 @@ export const pickTextFile = (accept: string): Promise<{ name: string; text: stri
     input.click();
   });
 
+/**
+ * Open the file picker for one or more files and hand back the File objects
+ * so the caller can choose how to read them. Resolves to an empty list when
+ * the writer cancels.
+ */
+export const pickFiles = (accept: string): Promise<ReadonlyArray<File>> =>
+  new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.multiple = true;
+
+    input.addEventListener("change", () => resolve([...(input.files ?? [])]));
+    input.addEventListener("cancel", () => resolve([]));
+    input.click();
+  });
+
 /** Turn a document title into a safe filename stem. */
 export const filenameStem = (title: string): string => {
   const stem = title

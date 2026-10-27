@@ -31,6 +31,8 @@ const ESTIMATED_CARD_HEIGHT = 120;
 export interface CommentaryPanelProps {
   readonly activeId: SuggestionId | null;
   readonly editor: Editor | null;
+  /** Open notes about the lead. Shown first; they have no highlight to anchor to. */
+  readonly leadNotes: ReadonlyArray<Suggestion>;
   onAccept(suggestion: Suggestion): void;
   onCommentChange(id: SuggestionId, comment: string): void;
   onDelete(suggestion: Suggestion): void;
@@ -374,6 +376,7 @@ const useHighlightAnchors = (
 export const CommentaryPanel = ({
   activeId,
   editor,
+  leadNotes,
   onAccept,
   onCommentChange,
   onDelete,
@@ -430,8 +433,31 @@ export const CommentaryPanel = ({
 
   return (
     <>
+      {leadNotes.length > 0 ? (
+        <section className="mb-6 flex flex-col gap-2">
+          <h3 className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Lead ({leadNotes.length})
+          </h3>
+          {leadNotes.map((suggestion) => (
+            <CommentaryCard
+              active={suggestion.id === activeId}
+              key={suggestion.id}
+              onAccept={onAccept}
+              onCommentChange={onCommentChange}
+              onDelete={onDelete}
+              onDismiss={onDismiss}
+              onMeasure={onMeasure}
+              onPlace={null}
+              onSelect={onSelect}
+              pass={passes.get(suggestion.passId)}
+              suggestion={suggestion}
+              top={null}
+            />
+          ))}
+        </section>
+      ) : null}
       <div className="relative" ref={panelRef} style={{ minHeight: panelHeight + CARD_GAP }}>
-        {suggestions.length === 0 && unplaced.length === 0 ? (
+        {suggestions.length === 0 && unplaced.length === 0 && leadNotes.length === 0 ? (
           <p className="px-1 text-sm text-muted-foreground">
             No open notes. Run a pass or select text and choose “Annotate”.
           </p>

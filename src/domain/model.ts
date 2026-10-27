@@ -11,6 +11,8 @@ export type SuggestionId = string & { readonly __brand: "SuggestionId" };
 
 export type PassPromptId = string & { readonly __brand: "PassPromptId" };
 
+export type ContextFileId = string & { readonly __brand: "ContextFileId" };
+
 // SAFETY: a fresh UUID is a valid DocumentId; the brand only prevents mixing id kinds.
 export const newDocumentId = (): DocumentId => crypto.randomUUID() as DocumentId;
 
@@ -26,17 +28,42 @@ export const newSuggestionId = (): SuggestionId => crypto.randomUUID() as Sugges
 // SAFETY: a fresh UUID is a valid PassPromptId; the brand only prevents mixing id kinds.
 export const newPassPromptId = (): PassPromptId => crypto.randomUUID() as PassPromptId;
 
+// SAFETY: a fresh UUID is a valid ContextFileId; the brand only prevents mixing id kinds.
+export const newContextFileId = (): ContextFileId => crypto.randomUUID() as ContextFileId;
+
 /** Id of the synthetic pass that holds annotations the writer adds by hand. */
 // SAFETY: "manual" is reserved and never produced by newPassId (UUIDs contain dashes).
 export const MANUAL_PASS_ID = "manual" as PassId;
 
-/** Working copy of a document. `content` is the live TipTap document. */
+/**
+ * Working copy of a document. `content` is the live TipTap document.
+ * `lead` is the short summary or hook shown outside the piece (a dek); it
+ * is not part of the prose and is sent to the model as context.
+ */
 export interface WorkshopDocument {
   readonly content: JSONContent;
   readonly createdAt: number;
   readonly id: DocumentId;
+  readonly lead: string;
   readonly title: string;
   readonly updatedAt: number;
+}
+
+/** Source format a context file was imported from. */
+export type ContextFileKind = "pdf" | "html" | "markdown" | "text";
+
+/**
+ * Reference material attached to a document: an earnings report, meeting
+ * notes, a source article. Not part of the prose. Stored as the plain text
+ * or Markdown extracted at import time and sent with every pass.
+ */
+export interface ContextFile {
+  readonly createdAt: number;
+  readonly documentId: DocumentId;
+  readonly id: ContextFileId;
+  readonly kind: ContextFileKind;
+  readonly name: string;
+  readonly text: string;
 }
 
 /** Point-in-time snapshot of a document. The writer may flag it as major. */
@@ -70,8 +97,15 @@ export interface Pass {
 export type SuggestionStatus = "open" | "accepted" | "dismissed";
 
 /**
- * Commentary attached to a span of the document. The span itself lives in
- * the editor as a mark carrying this suggestion's id, so it follows edits.
+ * Which text a note is about. Document notes anchor to a highlight in the
+ * editor; lead notes have no highlight because the lead is a plain field.
+ */
+export type SuggestionTarget = "document" | "lead";
+
+/**
+ * Commentary attached to a span of the document or to the lead. For
+ * document notes the span lives in the editor as a mark carrying this
+ * suggestion's id, so it follows edits.
  */
 export interface Suggestion {
   readonly comment: string;
@@ -83,6 +117,15 @@ export interface Suggestion {
   readonly quote: string;
   readonly replacement: string | null;
   readonly status: SuggestionStatus;
+  readonly target: SuggestionTarget;
+}
+
+/** A note as returned by the model, before it is stored and anchored. */
+export interface SuggestionDraft {
+  readonly comment: string;
+  readonly quote: string;
+  readonly replacement: string | null;
+  readonly target: SuggestionTarget;
 }
 
 /** A note from an earlier pass, summarised for the model as context. */
@@ -111,9 +154,13 @@ export interface LlmConfig {
 
 export interface Settings {
   readonly id: "settings";
+  /** Character limit enforced on the document lead. */
+  readonly leadMaxLength: number;
   readonly llm: LlmConfig;
   readonly systemPrompt: string;
 }
+
+export const DEFAULT_LEAD_MAX_LENGTH = 200;
 
 export const DEFAULT_SYSTEM_PROMPT = `Workshop a piece with me. NO ENCOURAGEMENT. Encouragement is useless; the only useful things are suggested corrections.
 DO NOT WRITE COPY FOR ME. Any words you provide will be disqualified, so if you come up with good words, I’m fucked because I can’t use
@@ -126,9 +173,9 @@ Tell me ABOUT what should change. Assume I know my audience extremely well. We�
  * so the parser and the instructions cannot drift apart.
  */
 export const RESPONSE_FORMAT_INSTRUCTIONS = `Respond with JSON only, in this exact form:
-{"suggestions":[{"quote":"exact text copied from the document","comment":"what should change and why","replacement":null}]}
+{"suggestions":[{"quote":"exact text copied from the text under review","comment":"what should change and why","replacement":null}]}
 
-"quote": copy it verbatim from the document, character for character, including punctuation. Keep each quote short (a phrase or a sentence). Never paraphrase it.
+"quote": copy it verbatim from the text under review, character for character, including punctuation. Keep each quote short (a phrase or a sentence). Never paraphrase it.
 "comment": describe the problem and the kind of change needed. Do not supply rewritten wording.
 "replacement": null. Use a string only for a mechanical typo fix (spelling, doubled word, punctuation).`;
 
@@ -205,6 +252,7 @@ Ethics: flag passives and nominalizations that hide who did something where the 
 
 export const DEFAULT_SETTINGS: Settings = {
   id: "settings",
+  leadMaxLength: DEFAULT_LEAD_MAX_LENGTH,
   llm: {
     apiKey: "",
     baseUrl: "https://api.openai.com/v1",

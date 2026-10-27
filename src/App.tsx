@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { toast } from "sonner";
 
 import { CommentaryPanel } from "@/components/CommentaryPanel";
+import { ContextDialog } from "@/components/ContextDialog";
 import { DocumentSidebar } from "@/components/DocumentSidebar";
+import { LeadField } from "@/components/LeadField";
 import { PassToolbar } from "@/components/PassToolbar";
 import { RevisionsDialog } from "@/components/RevisionsDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
@@ -25,6 +27,7 @@ import {
   reopenSuggestions,
   requestPersistentStorage,
   saveDocumentContent,
+  saveDocumentLead,
   seedDefaults,
   setPassHidden,
   setSuggestionStatus,
@@ -42,6 +45,7 @@ import {
   type SuggestionId,
   type WorkshopDocument,
 } from "@/domain/model";
+import { applyLeadReplacement } from "@/domain/leadNotes";
 import { buildTextIndex, type TextRange } from "@/domain/textIndex";
 import { formatStats, textStats } from "@/domain/wordCount";
 import { contentToMarkdown, markdownToContent } from "@/editor/markdown";
@@ -84,14 +88,15 @@ const backupToFile = async (): Promise<void> => {
   );
 };
 
-const restoreFromFile = async (): Promise<void> => {
+/** Resolves to true when rows were written, so the caller can reload the open document. */
+const restoreFromFile = async (): Promise<boolean> => {
   const picked = await pickTextFile(".json,application/json");
 
   if (picked === null) {
-    return;
+    return false;
   }
 
-  await runtime.runPromise(
+  return runtime.runPromise(
     importBackup(picked.text).pipe(
       Effect.tap((summary) =>
         Effect.sync(() =>
@@ -100,7 +105,14 @@ const restoreFromFile = async (): Promise<void> => {
           ),
         ),
       ),
-      Effect.catch((error) => Effect.sync(() => toast.error(error.message))),
+      Effect.map(() => true),
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          toast.error(error.message);
+
+          return false;
+        }),
+      ),
     ),
   );
 };
@@ -234,6 +246,11 @@ const Workspace = ({ doc }: WorkspaceProps) => {
   const pmDoc = useEditorDoc(editor);
   const selection = useEditorSelection(editor);
   const [revisionsOpen, setRevisionsOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
+  // Local copy so the pass runner always sees what is on screen, even
+  // before the live query catches up with the last keystroke.
+  const [lead, setLead] = useState(doc.lead);
+  const leadRef = useRef<HTMLDivElement | null>(null);
 
   const settings = useLiveQuery(() => db.settings.get("settings"), []) ?? DEFAULT_SETTINGS;
   const prompts = useLiveQuery(() => db.passPrompts.orderBy("order").toArray(), []) ?? NO_PROMPTS;
@@ -248,7 +265,18 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     useLiveQuery(() => db.suggestions.where("documentId").equals(doc.id).toArray(), [doc.id]) ??
     NO_SUGGESTIONS;
 
-  const runner = usePassRunner(editor, doc.id, settings);
+  const contextCount =
+    useLiveQuery(() => db.contextFiles.where("documentId").equals(doc.id).count(), [doc.id]) ?? 0;
+
+  const runner = usePassRunner(editor, doc.id, lead, settings);
+
+  const changeLead = useCallback(
+    (next: string) => {
+      setLead(next);
+      void saveDocumentLead(doc.id, next);
+    },
+    [doc.id],
+  );
 
   const statsLabel = useMemo(() => {
     if (pmDoc === null) {
@@ -296,12 +324,30 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     }
   }, [orderedSuggestions]);
 
-  /** Open notes with no highlight in the document. */
+  /** Open notes about the lead. They have no highlight; status is the source of truth. */
+  const leadNotes = useMemo(
+    () =>
+      visibleSuggestions.filter(
+        (suggestion) => suggestion.target === "lead" && suggestion.status === "open",
+      ),
+    [visibleSuggestions],
+  );
+
+  /** Notes the writer steps through: lead first, then the document in order. */
+  const navigable = useMemo(
+    () => [...leadNotes, ...orderedSuggestions],
+    [leadNotes, orderedSuggestions],
+  );
+
+  /** Open document notes with no highlight in the document. */
   const unplaced = useMemo(() => {
     const placedIds = new Set(orderedSuggestions.map((suggestion) => suggestion.id));
 
     return visibleSuggestions.filter(
-      (suggestion) => suggestion.status === "open" && !placedIds.has(suggestion.id),
+      (suggestion) =>
+        suggestion.target === "document" &&
+        suggestion.status === "open" &&
+        !placedIds.has(suggestion.id),
     );
   }, [orderedSuggestions, visibleSuggestions]);
 
@@ -321,17 +367,19 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     return map;
   }, [doc.id, passes]);
 
-  const activeIndex = orderedSuggestions.findIndex((suggestion) => suggestion.id === activeId);
+  const activeIndex = navigable.findIndex((suggestion) => suggestion.id === activeId);
 
   const select = useCallback(
     (id: SuggestionId) => {
       setActiveId(id);
 
-      if (editor !== null) {
+      if (leadNotes.some((note) => note.id === id)) {
+        leadRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (editor !== null) {
         revealSuggestionInEditor(editor, id);
       }
     },
-    [editor],
+    [editor, leadNotes],
   );
 
   /** Clicking a stack of overlapping highlights cycles through them. */
@@ -349,28 +397,28 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
   const step = useCallback(
     (delta: number) => {
-      if (orderedSuggestions.length === 0) {
+      if (navigable.length === 0) {
         return;
       }
 
       const base = activeIndex === -1 ? (delta > 0 ? -1 : 0) : activeIndex;
-      const next = (base + delta + orderedSuggestions.length) % orderedSuggestions.length;
-      const target = orderedSuggestions[next];
+      const next = (base + delta + navigable.length) % navigable.length;
+      const target = navigable[next];
 
       if (target !== undefined) {
         select(target.id);
       }
     },
-    [activeIndex, orderedSuggestions, select],
+    [activeIndex, navigable, select],
   );
 
   const advanceAfterResolve = useCallback(
     (resolvedNote: Suggestion) => {
-      const index = orderedSuggestions.findIndex((suggestion) => suggestion.id === resolvedNote.id);
-      const next = orderedSuggestions[index + 1] ?? orderedSuggestions[index - 1] ?? null;
+      const index = navigable.findIndex((suggestion) => suggestion.id === resolvedNote.id);
+      const next = navigable[index + 1] ?? navigable[index - 1] ?? null;
       setActiveId(next === null ? null : next.id);
     },
-    [orderedSuggestions],
+    [navigable],
   );
 
   const accept = useCallback(
@@ -379,11 +427,16 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         return;
       }
 
-      acceptSuggestionInEditor(editor, suggestion);
+      if (suggestion.target === "lead") {
+        changeLead(applyLeadReplacement(lead, suggestion));
+      } else {
+        acceptSuggestionInEditor(editor, suggestion);
+      }
+
       advanceAfterResolve(suggestion);
       await setSuggestionStatus(suggestion.id, "accepted");
     },
-    [advanceAfterResolve, editor],
+    [advanceAfterResolve, changeLead, editor, lead],
   );
 
   const dismiss = useCallback(
@@ -392,7 +445,10 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         return;
       }
 
-      dismissSuggestionInEditor(editor, suggestion.id);
+      if (suggestion.target === "document") {
+        dismissSuggestionInEditor(editor, suggestion.id);
+      }
+
       advanceAfterResolve(suggestion);
       await setSuggestionStatus(suggestion.id, "dismissed");
     },
@@ -400,7 +456,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
   );
 
   const remove = async (suggestion: Suggestion) => {
-    if (editor !== null) {
+    if (editor !== null && suggestion.target === "document") {
       dismissSuggestionInEditor(editor, suggestion.id);
     }
 
@@ -408,7 +464,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     await deleteSuggestion(suggestion.id);
   };
 
-  const activeSuggestion = orderedSuggestions[activeIndex] ?? null;
+  const activeSuggestion = navigable[activeIndex] ?? null;
 
   // Alt+↓/↑ (or Alt+J/K) step; Alt+Enter accepts; Alt+Backspace dismisses.
   // Handlers are read through a ref so the listener is attached once.
@@ -448,12 +504,13 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
   /**
    * Bring a resolved note back. If its quote is still in the text the
-   * highlight is restored; otherwise it lands in Unplaced.
+   * highlight is restored; otherwise it lands in Unplaced. Lead notes have
+   * no highlight and simply reappear beside the lead.
    */
   const reopen = async (suggestion: Suggestion) => {
     await reopenSuggestions([suggestion.id]);
 
-    if (editor !== null) {
+    if (editor !== null && suggestion.target === "document") {
       const tone = passesById.get(suggestion.passId)?.tone ?? 0;
       applySuggestionMarks(editor, suggestion.passId, tone, [suggestion]);
     }
@@ -479,7 +536,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     }
 
     const [saved] = await addSuggestions(doc.id, MANUAL_PASS_ID, [
-      { comment: "", quote, replacement: null },
+      { comment: "", quote, replacement: null, target: "document" },
     ]);
 
     if (saved === undefined) {
@@ -531,6 +588,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
       <style>{highlightStyles(activeId, hiddenPassIds)}</style>
       <PassToolbar
         activeIndex={activeIndex}
+        contextCount={contextCount}
         onDeletePass={(pass) => void removePass(pass)}
         onExportMarkdown={() => {
           const content = editor?.getJSON() ?? doc.content;
@@ -541,10 +599,11 @@ const Workspace = ({ doc }: WorkspaceProps) => {
           );
         }}
         onNext={() => step(1)}
+        onOpenContext={() => setContextOpen(true)}
         onOpenRevisions={() => setRevisionsOpen(true)}
         onPrevious={() => step(-1)}
         onTogglePass={(pass) => void setPassHidden(pass.id, !pass.hidden)}
-        openCount={orderedSuggestions.length}
+        openCount={navigable.length}
         passes={passes}
         prompts={prompts}
         runner={runner}
@@ -571,6 +630,17 @@ const Workspace = ({ doc }: WorkspaceProps) => {
               }}
               placeholder="Untitled"
             />
+            <LeadField
+              activeTone={
+                activeSuggestion?.target === "lead"
+                  ? (passesById.get(activeSuggestion.passId)?.tone ?? 0)
+                  : null
+              }
+              maxLength={settings.leadMaxLength}
+              onChange={changeLead}
+              ref={leadRef}
+              value={lead}
+            />
             <ProseEditor
               initialContent={doc.content}
               onAnnotate={(range, quote) => void annotate(range, quote)}
@@ -583,6 +653,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
             <CommentaryPanel
               activeId={activeId}
               editor={editor}
+              leadNotes={leadNotes}
               onAccept={(suggestion) => void accept(suggestion)}
               onCommentChange={(id, comment) => void updateSuggestionComment(id, comment)}
               onDelete={(suggestion) => void remove(suggestion)}
@@ -606,6 +677,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         onRestore={(revision) => void restore(revision)}
         open={revisionsOpen}
       />
+      <ContextDialog documentId={doc.id} onOpenChange={setContextOpen} open={contextOpen} />
     </div>
   );
 };
@@ -615,7 +687,16 @@ const App = () => {
   const settings = useLiveQuery(() => db.settings.get("settings"), []) ?? DEFAULT_SETTINGS;
   const [activeDocumentId, setActiveDocumentId] = useState<DocumentId | null>(readStoredDocumentId);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Bumped after a backup restore. The workspace holds the editor content
+  // and lead in local state, so it is remounted to pick up restored rows.
+  const [restoreCount, setRestoreCount] = useState(0);
   const theme = useTheme();
+
+  const restoreBackup = async () => {
+    if (await restoreFromFile()) {
+      setRestoreCount((count) => count + 1);
+    }
+  };
 
   useEffect(() => {
     void seedDefaults();
@@ -664,7 +745,7 @@ const App = () => {
         onCycleTheme={() => theme.setPreference(NEXT_THEME[theme.preference])}
         onDelete={(id) => void confirmDeleteDocument(id)}
         onExportBackup={() => void backupToFile()}
-        onImportBackup={() => void restoreFromFile()}
+        onImportBackup={() => void restoreBackup()}
         onImportMarkdown={() => void importMarkdown()}
         onOpenSettings={() => setSettingsOpen(true)}
         onSelect={setActiveDocumentId}
@@ -675,7 +756,7 @@ const App = () => {
           {documents === undefined ? "Loading…" : "Create a document to begin."}
         </div>
       ) : (
-        <Workspace doc={activeDocument} key={activeDocument.id} />
+        <Workspace doc={activeDocument} key={`${activeDocument.id}:${restoreCount}`} />
       )}
       <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} settings={settings} />
       <Toaster position="bottom-right" theme={theme.resolved} />

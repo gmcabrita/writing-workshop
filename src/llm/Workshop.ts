@@ -1,7 +1,13 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
-import type { SuggestionDraft } from "@/db/repo";
-import { type LlmConfig, type PriorNote, RESPONSE_FORMAT_INSTRUCTIONS } from "@/domain/model";
+import {
+  type ContextFile,
+  type LlmConfig,
+  type PriorNote,
+  RESPONSE_FORMAT_INSTRUCTIONS,
+  type SuggestionDraft,
+  type SuggestionTarget,
+} from "@/domain/model";
 import { type ChatMessage, LlmClient, type LlmError } from "@/llm/LlmClient";
 
 export class WorkshopParseError extends Schema.TaggedError<WorkshopParseError>()(
@@ -43,8 +49,10 @@ const extractJson = (raw: string): string => {
   return candidate.slice(firstBrace, lastBrace + 1);
 };
 
+/** `subject` becomes the target of every parsed note. */
 export const parseSuggestions = (
   raw: string,
+  subject: SuggestionTarget,
 ): Effect.Effect<ReadonlyArray<SuggestionDraft>, WorkshopParseError> =>
   Effect.try({
     catch: () => new WorkshopParseError({ message: "Model did not return JSON.", raw }),
@@ -65,6 +73,7 @@ export const parseSuggestions = (
         comment: item.comment.trim(),
         quote: item.quote,
         replacement: item.replacement ?? null,
+        target: subject,
       })),
     ),
   );
@@ -74,12 +83,22 @@ export const MAX_PRIOR_NOTES = 40;
 
 export interface PassRequest {
   readonly config: LlmConfig;
+  /** Reference material the writer attached to the document. */
+  readonly contextFiles: ReadonlyArray<ContextFile>;
   readonly documentText: string;
   /** True when `documentText` is a selection from a longer piece. */
   readonly excerpt: boolean;
+  /** Summary or hook shown outside the piece. Empty when there is none. */
+  readonly lead: string;
   readonly passPrompt: string;
   /** Notes from earlier passes on this document, newest first. */
   readonly priorNotes: ReadonlyArray<PriorNote>;
+  /**
+   * What the notes are about. A document pass sends the lead as context
+   * only; a lead pass sends the document as context and asks for notes on
+   * the lead alone. The runner sends both for a whole-document pass.
+   */
+  readonly subject: SuggestionTarget;
   readonly systemPrompt: string;
 }
 
@@ -111,13 +130,55 @@ const priorNotesSection = (notes: ReadonlyArray<PriorNote>): string => {
   return `\n\n## Earlier notes on this document\n\nDo not repeat these. Declined notes mean the writer disagrees; drop the point.\n\n${lines.join("\n")}`;
 };
 
+/**
+ * On a document pass the lead is context: the promise the document must
+ * keep. Omitted for excerpts and when there is no lead.
+ */
+const leadContextSection = (request: PassRequest): string =>
+  request.excerpt || request.lead.trim().length === 0
+    ? ""
+    : `## Lead\n\nShown outside the piece, before the title, as its summary or hook. It is reviewed in a separate request: do not comment on the lead here, and do not attach notes about it to document sentences. Use it only to judge whether the document delivers what it promises.\n\n${request.lead.trim()}\n\n`;
+
+/**
+ * Reference material (reports, notes, sources) is sent in full. It is
+ * background for judging the document, never a target for notes.
+ */
+const contextFilesSection = (files: ReadonlyArray<ContextFile>): string => {
+  if (files.length === 0) {
+    return "";
+  }
+
+  const blocks = files.map((file) => `### ${file.name}\n\n${file.text.trim()}`);
+
+  return `## Reference material\n\nBackground the writer supplied. Use it to check facts, figures, and emphasis. Do not quote from it; quotes must come from the document.\n\n${blocks.join("\n\n")}\n\n`;
+};
+
+const documentSection = (request: PassRequest): string =>
+  request.excerpt
+    ? `## Excerpt\n\nThe writer selected this excerpt from a longer piece. Comment only on the excerpt; do not assume what surrounds it.\n\n${request.documentText}`
+    : `## Document\n\n${request.documentText}`;
+
+/**
+ * A lead pass inverts the roles: the document is context and the lead is
+ * the text under review. Every quote must come from the lead.
+ */
+const leadSubjectBody = (request: PassRequest): string =>
+  `## Editing pass\n\n${request.passPrompt}\n\n` +
+  contextFilesSection(request.contextFiles) +
+  `## Document (context only)\n\nThe piece the lead introduces. Do not comment on it or quote from it here.\n\n${request.documentText}\n\n` +
+  `## Lead (the text to workshop)\n\nShown outside the piece, before the title, as its summary or hook. Apply the pass to the lead as a complete text of its own: it must stand alone and keep the promise the document makes. Every quote must be copied verbatim from the lead. Return an empty list if the pass does not apply.\n\n${request.lead.trim()}`;
+
+const documentSubjectBody = (request: PassRequest): string =>
+  `## Editing pass\n\n${request.passPrompt}\n\n` +
+  contextFilesSection(request.contextFiles) +
+  leadContextSection(request) +
+  documentSection(request);
+
 export const buildMessages = (request: PassRequest): ReadonlyArray<ChatMessage> => [
   { content: `${request.systemPrompt.trim()}\n\n${RESPONSE_FORMAT_INSTRUCTIONS}`, role: "system" },
   {
     content:
-      (request.excerpt
-        ? `## Editing pass\n\n${request.passPrompt}\n\n## Excerpt\n\nThe writer selected this excerpt from a longer piece. Comment only on the excerpt; do not assume what surrounds it.\n\n${request.documentText}`
-        : `## Editing pass\n\n${request.passPrompt}\n\n## Document\n\n${request.documentText}`) +
+      (request.subject === "lead" ? leadSubjectBody(request) : documentSubjectBody(request)) +
       priorNotesSection(request.priorNotes),
     role: "user",
   },
@@ -140,7 +201,12 @@ export class Workshop extends Context.Service<
       const runPass = Effect.fn("Workshop.runPass")(function* (request: PassRequest) {
         const raw = yield* llm.complete(request.config, buildMessages(request));
 
-        return yield* parseSuggestions(raw);
+        // The raw reply is not stored. Log it so a pass that returns fewer
+        // notes than expected can be checked in the browser console.
+        // oxlint-disable-next-line no-console
+        console.debug("[workshop] model reply", raw);
+
+        return yield* parseSuggestions(raw, request.subject);
       });
 
       return Workshop.of({ runPass });

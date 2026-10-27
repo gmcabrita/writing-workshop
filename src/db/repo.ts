@@ -2,11 +2,15 @@ import type { JSONContent } from "@tiptap/core";
 
 import { db } from "@/db/database";
 import {
+  type ContextFile,
+  type ContextFileId,
+  type ContextFileKind,
   DEFAULT_PASS_PROMPTS,
   DEFAULT_SETTINGS,
   type DocumentId,
   EMPTY_DOCUMENT_CONTENT,
   type LlmConfig,
+  newContextFileId,
   newDocumentId,
   newPassId,
   newPassPromptId,
@@ -22,6 +26,7 @@ import {
   type RevisionId,
   type Settings,
   type Suggestion,
+  type SuggestionDraft,
   type SuggestionId,
   type SuggestionStatus,
   TONE_COUNT,
@@ -40,6 +45,7 @@ export const createDocumentWithContent = async (
     content,
     createdAt: now,
     id: newDocumentId(),
+    lead: "",
     title,
     updatedAt: now,
   };
@@ -58,13 +64,56 @@ export const saveDocumentContent = (id: DocumentId, content: JSONContent): Promi
 export const renameDocument = (id: DocumentId, title: string): Promise<number> =>
   db.documents.update(id, { title, updatedAt: Date.now() });
 
+export const saveDocumentLead = (id: DocumentId, lead: string): Promise<number> =>
+  db.documents.update(id, { lead, updatedAt: Date.now() });
+
 export const deleteDocument = (id: DocumentId): Promise<void> =>
-  db.transaction("rw", [db.documents, db.revisions, db.passes, db.suggestions], async () => {
-    await db.documents.delete(id);
-    await db.revisions.where("documentId").equals(id).delete();
-    await db.passes.where("documentId").equals(id).delete();
-    await db.suggestions.where("documentId").equals(id).delete();
-  });
+  db.transaction(
+    "rw",
+    [db.documents, db.revisions, db.passes, db.suggestions, db.contextFiles],
+    async () => {
+      await db.documents.delete(id);
+      await db.revisions.where("documentId").equals(id).delete();
+      await db.passes.where("documentId").equals(id).delete();
+      await db.suggestions.where("documentId").equals(id).delete();
+      await db.contextFiles.where("documentId").equals(id).delete();
+    },
+  );
+
+/* Context files */
+
+export interface ContextFileDraft {
+  readonly kind: ContextFileKind;
+  readonly name: string;
+  readonly text: string;
+}
+
+export const addContextFile = async (
+  documentId: DocumentId,
+  draft: ContextFileDraft,
+): Promise<ContextFile> => {
+  const file: ContextFile = {
+    createdAt: Date.now(),
+    documentId,
+    id: newContextFileId(),
+    kind: draft.kind,
+    name: draft.name,
+    text: draft.text,
+  };
+
+  await db.contextFiles.add(file);
+
+  return file;
+};
+
+export const updateContextFile = (id: ContextFileId, name: string, text: string): Promise<number> =>
+  db.contextFiles.update(id, { name, text });
+
+export const deleteContextFile = (id: ContextFileId): Promise<void> => db.contextFiles.delete(id);
+
+/** Context files for a document, oldest first, as attached to a pass. */
+export const loadContextFiles = (documentId: DocumentId): Promise<ReadonlyArray<ContextFile>> =>
+  db.contextFiles.where("documentId").equals(documentId).sortBy("createdAt");
 
 /* Revisions */
 
@@ -129,12 +178,6 @@ export const deletePass = (id: PassId): Promise<void> =>
     await db.suggestions.where("passId").equals(id).delete();
   });
 
-export interface SuggestionDraft {
-  readonly comment: string;
-  readonly quote: string;
-  readonly replacement: string | null;
-}
-
 export const addSuggestions = async (
   documentId: DocumentId,
   passId: PassId,
@@ -152,6 +195,7 @@ export const addSuggestions = async (
     quote: draft.quote,
     replacement: draft.replacement,
     status: "open",
+    target: draft.target,
   }));
 
   await db.suggestions.bulkAdd(suggestions);
@@ -203,6 +247,12 @@ export const saveSystemPrompt = async (systemPrompt: string): Promise<"settings"
   const current = await loadSettings();
 
   return saveSettings({ ...current, systemPrompt });
+};
+
+export const saveLeadMaxLength = async (leadMaxLength: number): Promise<"settings"> => {
+  const current = await loadSettings();
+
+  return saveSettings({ ...current, leadMaxLength });
 };
 
 export const createPassPrompt = async (name: string, prompt: string): Promise<PassPrompt> => {

@@ -24,11 +24,13 @@ import {
   createPassPrompt,
   deletePassPrompt,
   restoreDefaultPassPrompts,
+  saveLeadMaxLength,
   saveLlmConfig,
   saveSystemPrompt,
   updatePassPrompt,
 } from "@/db/repo";
 import {
+  DEFAULT_LEAD_MAX_LENGTH,
   DEFAULT_SYSTEM_PROMPT,
   RESPONSE_FORMAT_INSTRUCTIONS,
   type LlmConfig,
@@ -217,6 +219,39 @@ const SystemPromptTab = ({ systemPrompt }: { readonly systemPrompt: string }) =>
   );
 };
 
+const WritingTab = ({ leadMaxLength }: { readonly leadMaxLength: number }) => {
+  const [draft, setDraft] = useState(leadMaxLength);
+  const valid = Number.isInteger(draft) && draft > 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-1.5">
+        <Label htmlFor="lead-max-length">Lead length limit</Label>
+        <Input
+          className="w-32"
+          id="lead-max-length"
+          min={1}
+          onChange={(event) => setDraft(Number.parseInt(event.target.value, 10))}
+          step={1}
+          type="number"
+          value={Number.isNaN(draft) ? "" : draft}
+        />
+        <p className="text-xs text-muted-foreground">
+          Characters allowed in the lead under the title. Default {DEFAULT_LEAD_MAX_LENGTH}.
+        </p>
+      </div>
+      <div className="flex justify-end">
+        <Button
+          disabled={!valid || draft === leadMaxLength}
+          onClick={() => void saveLeadMaxLength(draft)}
+        >
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const PassPromptEditor = ({ passPrompt }: { readonly passPrompt: PassPrompt }) => {
   const [name, setName] = useState(passPrompt.name);
   const [prompt, setPrompt] = useState(passPrompt.prompt);
@@ -317,6 +352,7 @@ export const SettingsDialog = ({ onOpenChange, open, settings }: SettingsDialogP
           <TabsTrigger value="connection">Connection</TabsTrigger>
           <TabsTrigger value="system">System prompt</TabsTrigger>
           <TabsTrigger value="passes">Pass prompts</TabsTrigger>
+          <TabsTrigger value="writing">Writing</TabsTrigger>
         </TabsList>
         <TabsContent className="pt-4" value="connection">
           <ConnectionTab key={JSON.stringify(settings.llm)} llm={settings.llm} />
@@ -326,6 +362,9 @@ export const SettingsDialog = ({ onOpenChange, open, settings }: SettingsDialogP
         </TabsContent>
         <TabsContent className="pt-4" value="passes">
           <PassPromptsTab />
+        </TabsContent>
+        <TabsContent className="pt-4" value="writing">
+          <WritingTab key={settings.leadMaxLength} leadMaxLength={settings.leadMaxLength} />
         </TabsContent>
       </Tabs>
     </DialogContent>

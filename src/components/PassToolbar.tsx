@@ -6,6 +6,7 @@ import {
   EyeOffIcon,
   HistoryIcon,
   Loader2Icon,
+  PaperclipIcon,
   PlayIcon,
   TextSelectIcon,
   XIcon,
@@ -27,9 +28,12 @@ import { cn } from "@/lib/utils";
 
 export interface PassToolbarProps {
   readonly activeIndex: number;
+  /** Number of context files attached to the document. */
+  readonly contextCount: number;
   onDeletePass(pass: Pass): void;
   onExportMarkdown(): void;
   onNext(): void;
+  onOpenContext(): void;
   onOpenRevisions(): void;
   onPrevious(): void;
   onTogglePass(pass: Pass): void;
@@ -45,9 +49,11 @@ export interface PassToolbarProps {
 
 export const PassToolbar = ({
   activeIndex,
+  contextCount,
   onDeletePass,
   onExportMarkdown,
   onNext,
+  onOpenContext,
   onOpenRevisions,
   onPrevious,
   onTogglePass,
@@ -182,15 +188,48 @@ export const PassToolbar = ({
         >
           {statsLabel}
         </span>
-        <Button onClick={onExportMarkdown} size="sm" title="Download as Markdown" variant="ghost">
-          <DownloadIcon />
-          Export
-        </Button>
-        <Button onClick={onOpenRevisions} size="sm" variant="ghost">
-          <HistoryIcon />
-          Revisions
-        </Button>
+        <DocumentActions
+          contextCount={contextCount}
+          onExportMarkdown={onExportMarkdown}
+          onOpenContext={onOpenContext}
+          onOpenRevisions={onOpenRevisions}
+        />
       </div>
     </div>
   );
 };
+
+interface DocumentActionsProps {
+  readonly contextCount: number;
+  onExportMarkdown(): void;
+  onOpenContext(): void;
+  onOpenRevisions(): void;
+}
+
+/** Document-level buttons at the right end of the toolbar. */
+const DocumentActions = ({
+  contextCount,
+  onExportMarkdown,
+  onOpenContext,
+  onOpenRevisions,
+}: DocumentActionsProps) => (
+  <>
+    <Button
+      onClick={onOpenContext}
+      size="sm"
+      title="Reference material sent with every pass"
+      variant="ghost"
+    >
+      <PaperclipIcon />
+      Context{contextCount > 0 ? ` (${contextCount})` : ""}
+    </Button>
+    <Button onClick={onExportMarkdown} size="sm" title="Download as Markdown" variant="ghost">
+      <DownloadIcon />
+      Export
+    </Button>
+    <Button onClick={onOpenRevisions} size="sm" variant="ghost">
+      <HistoryIcon />
+      Revisions
+    </Button>
+  </>
+);

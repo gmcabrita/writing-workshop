@@ -9,13 +9,17 @@ import {
   createRevision,
   deletePass,
   finishPass,
+  loadContextFiles,
   loadPriorNotes,
 } from "@/db/repo";
-import type { DocumentId, PassId, PassPrompt, Settings } from "@/domain/model";
+import { retargetLeadDrafts } from "@/domain/leadNotes";
+import type { DocumentId, PassId, PassPrompt, Settings, SuggestionDraft } from "@/domain/model";
 import { buildTextIndex, type TextRange } from "@/domain/textIndex";
 import { applySuggestionMarks, textInRange } from "@/editor/suggestionActions";
 import { Workshop } from "@/llm/Workshop";
 import { runtime } from "@/runtime";
+
+const NO_DRAFTS: ReadonlyArray<SuggestionDraft> = [];
 
 export interface RunningPass {
   readonly passId: PassId;
@@ -32,10 +36,12 @@ export interface PassRunner {
 /**
  * Drives one LLM pass end to end: create the pass record, call the model,
  * anchor its notes to the prose, persist them, and report the outcome.
+ * `lead` is the document's current lead text, sent as context.
  */
 export const usePassRunner = (
   editor: Editor | null,
   documentId: DocumentId | null,
+  lead: string,
   settings: Settings,
 ): PassRunner => {
   const [running, setRunning] = useState<RunningPass | null>(null);
@@ -64,36 +70,74 @@ export const usePassRunner = (
       const program = Effect.gen(function* () {
         const workshop = yield* Workshop;
 
-        const priorNotes = yield* Effect.promise(() => loadPriorNotes(documentId));
+        const [priorNotes, contextFiles] = yield* Effect.promise(() =>
+          Promise.all([loadPriorNotes(documentId), loadContextFiles(documentId)]),
+        );
 
-        const drafts = yield* workshop.runPass({
+        const documentText =
+          scope === null ? buildTextIndex(editor.state.doc).text : textInRange(editor, scope);
+
+        const base = {
           config: settings.llm,
-          documentText:
-            scope === null ? buildTextIndex(editor.state.doc).text : textInRange(editor, scope),
+          contextFiles,
+          documentText,
           excerpt: scope !== null,
+          lead,
           passPrompt: prompt.prompt,
           priorNotes,
           systemPrompt: settings.systemPrompt,
-        });
+        };
 
-        // Every note is kept. Those whose quote cannot be found get no
-        // highlight and appear in the margin as unplaced.
+        // A whole-document pass with a lead is two requests, run together:
+        // one on the document, one on the lead alone. The lead request is
+        // separate so the model gives it full attention and so every note
+        // it returns is known to be about the lead.
+        const workshopLead = scope === null && lead.trim().length > 0;
+
+        const [documentDrafts, leadDrafts] = yield* Effect.all(
+          [
+            workshop.runPass({ ...base, subject: "document" }),
+            workshopLead
+              ? workshop.runPass({ ...base, subject: "lead" })
+              : Effect.succeed(NO_DRAFTS),
+          ],
+          { concurrency: 2 },
+        );
+
+        // Lead quotes in the document reply would otherwise be unplaced.
+        const drafts = [
+          ...leadDrafts,
+          ...(scope === null
+            ? retargetLeadDrafts(documentDrafts, documentText, lead)
+            : documentDrafts),
+        ];
+
+        // Every note is kept. Document notes whose quote cannot be found get
+        // no highlight and appear in the margin as unplaced. Lead notes
+        // never get a highlight; they sit beside the lead field.
         const saved = yield* Effect.promise(() => addSuggestions(documentId, pass.id, drafts));
+        const documentNotes = saved.filter((note) => note.target === "document");
 
         const placed = yield* Effect.sync(() =>
-          applySuggestionMarks(editor, pass.id, pass.tone, saved, scope),
+          applySuggestionMarks(editor, pass.id, pass.tone, documentNotes, scope),
         );
 
         yield* Effect.promise(() => finishPass(pass.id, "done", null));
 
-        return { placed, unplaced: saved.length - placed };
+        return {
+          lead: saved.length - documentNotes.length,
+          placed,
+          unplaced: documentNotes.length - placed,
+        };
       }).pipe(
         Effect.tap((outcome) =>
           Effect.sync(() => {
+            const lead = outcome.lead > 0 ? ` ${outcome.lead} on the lead.` : "";
+
             const unplaced =
               outcome.unplaced > 0 ? ` ${outcome.unplaced} unplaced (quote not found).` : "";
 
-            toast.success(`${prompt.name}: ${outcome.placed} notes.${unplaced}`);
+            toast.success(`${prompt.name}: ${outcome.placed} notes.${lead}${unplaced}`);
           }),
         ),
         Effect.catch((error) =>
@@ -116,7 +160,7 @@ export const usePassRunner = (
         setRunning(null);
       }
     },
-    [documentId, editor, running, settings],
+    [documentId, editor, lead, running, settings],
   );
 
   const cancel = useCallback(() => {
