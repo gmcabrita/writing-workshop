@@ -377,9 +377,20 @@ const Workspace = ({ doc }: WorkspaceProps) => {
 
   const activeIndex = navigable.findIndex((suggestion) => suggestion.id === activeId);
 
+  const [notesCollapsed, setNotesCollapsed] = useState(
+    () => localStorage.getItem(NOTES_COLLAPSED_KEY) === "true",
+  );
+
+  useEffect(() => {
+    localStorage.setItem(NOTES_COLLAPSED_KEY, String(notesCollapsed));
+  }, [notesCollapsed]);
+
+  // Selecting a note from the editor (highlight click, prev/next) brings the
+  // notes column back so the selected card is visible.
   const select = useCallback(
     (id: SuggestionId) => {
       setActiveId(id);
+      setNotesCollapsed(false);
 
       if (leadNotes.some((note) => note.id === id)) {
         leadRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -556,6 +567,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
       .addSuggestionMark(range, { id: saved.id, passId: MANUAL_PASS_ID, tone: 0 })
       .run();
     setActiveId(saved.id);
+    setNotesCollapsed(false);
   };
 
   const removePass = async (pass: Pass) => {
@@ -598,14 +610,6 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     side: "left",
     storageKey: "writing-workshop:notes-width",
   });
-
-  const [notesCollapsed, setNotesCollapsed] = useState(
-    () => localStorage.getItem(NOTES_COLLAPSED_KEY) === "true",
-  );
-
-  useEffect(() => {
-    localStorage.setItem(NOTES_COLLAPSED_KEY, String(notesCollapsed));
-  }, [notesCollapsed]);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
