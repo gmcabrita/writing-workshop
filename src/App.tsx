@@ -645,7 +645,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         <div className="flex gap-6 px-8 py-10">
           {/* Notes pin to the right edge; the editor centers in the rest with
               a cap that keeps prose lines readable. */}
-          <div className="mx-auto w-full max-w-3xl min-w-0">
+          <div className="mx-auto w-full max-w-4xl min-w-0">
             <input
               aria-label="Document title"
               className="mb-6 w-full bg-transparent text-4xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/50"
