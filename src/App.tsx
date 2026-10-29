@@ -276,7 +276,18 @@ const Workspace = ({ doc }: WorkspaceProps) => {
   const contextCount =
     useLiveQuery(() => db.contextFiles.where("documentId").equals(doc.id).count(), [doc.id]) ?? 0;
 
-  const runner = usePassRunner(editor, doc.id, lead, settings);
+  const [notesCollapsed, setNotesCollapsed] = useState(
+    () => localStorage.getItem(NOTES_COLLAPSED_KEY) === "true",
+  );
+
+  useEffect(() => {
+    localStorage.setItem(NOTES_COLLAPSED_KEY, String(notesCollapsed));
+  }, [notesCollapsed]);
+
+  const showNotes = useCallback(() => setNotesCollapsed(false), []);
+
+  // A finished pass reveals its notes even when the column was hidden.
+  const runner = usePassRunner(editor, doc.id, lead, settings, showNotes);
 
   const changeLead = useCallback(
     (next: string) => {
@@ -376,14 +387,6 @@ const Workspace = ({ doc }: WorkspaceProps) => {
   }, [doc.id, passes]);
 
   const activeIndex = navigable.findIndex((suggestion) => suggestion.id === activeId);
-
-  const [notesCollapsed, setNotesCollapsed] = useState(
-    () => localStorage.getItem(NOTES_COLLAPSED_KEY) === "true",
-  );
-
-  useEffect(() => {
-    localStorage.setItem(NOTES_COLLAPSED_KEY, String(notesCollapsed));
-  }, [notesCollapsed]);
 
   // Selecting a note from the editor (highlight click, prev/next) brings the
   // notes column back so the selected card is visible.

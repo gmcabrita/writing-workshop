@@ -36,13 +36,15 @@ export interface PassRunner {
 /**
  * Drives one LLM pass end to end: create the pass record, call the model,
  * anchor its notes to the prose, persist them, and report the outcome.
- * `lead` is the document's current lead text, sent as context.
+ * `lead` is the document's current lead text, sent as context. `onPassDone`
+ * fires once a pass has saved its notes; it does not fire on error or cancel.
  */
 export const usePassRunner = (
   editor: Editor | null,
   documentId: DocumentId | null,
   lead: string,
   settings: Settings,
+  onPassDone: () => void,
 ): PassRunner => {
   const [running, setRunning] = useState<RunningPass | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -138,6 +140,7 @@ export const usePassRunner = (
               outcome.unplaced > 0 ? ` ${outcome.unplaced} unplaced (quote not found).` : "";
 
             toast.success(`${prompt.name}: ${outcome.placed} notes.${lead}${unplaced}`);
+            onPassDone();
           }),
         ),
         Effect.catch((error) =>
@@ -160,7 +163,7 @@ export const usePassRunner = (
         setRunning(null);
       }
     },
-    [documentId, editor, lead, running, settings],
+    [documentId, editor, lead, onPassDone, running, settings],
   );
 
   const cancel = useCallback(() => {
