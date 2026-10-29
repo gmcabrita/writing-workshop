@@ -5,6 +5,7 @@ import {
   type LucideIcon,
   MonitorIcon,
   MoonIcon,
+  PanelLeftCloseIcon,
   PlusIcon,
   SettingsIcon,
   SunIcon,
@@ -38,6 +39,7 @@ const THEME_LABEL: Record<ThemePreference, string> = {
 export interface DocumentSidebarProps {
   readonly activeId: DocumentId | null;
   readonly documents: ReadonlyArray<WorkshopDocument>;
+  onCollapse(): void;
   onCreate(): void;
   onCycleTheme(): void;
   onDelete(id: DocumentId): void;
@@ -47,11 +49,14 @@ export interface DocumentSidebarProps {
   onOpenSettings(): void;
   onSelect(id: DocumentId): void;
   readonly theme: ThemePreference;
+  /** Pixel width. The parent owns it so the drag handle can change it. */
+  readonly width: number;
 }
 
 export const DocumentSidebar = ({
   activeId,
   documents,
+  onCollapse,
   onCreate,
   onCycleTheme,
   onDelete,
@@ -61,13 +66,28 @@ export const DocumentSidebar = ({
   onOpenSettings,
   onSelect,
   theme,
+  width,
 }: DocumentSidebarProps) => (
-  <aside className="flex h-full w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+  <aside
+    className="flex h-full shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground"
+    style={{ width }}
+  >
     <div className="flex items-center justify-between px-3 py-3">
       <span className="text-sm font-semibold tracking-tight">Workshop</span>
-      <Button aria-label="New document" onClick={onCreate} size="icon-sm" variant="ghost">
-        <PlusIcon />
-      </Button>
+      <div className="flex items-center gap-0.5">
+        <Button aria-label="New document" onClick={onCreate} size="icon-sm" variant="ghost">
+          <PlusIcon />
+        </Button>
+        <Button
+          aria-label="Hide sidebar"
+          onClick={onCollapse}
+          size="icon-sm"
+          title="Hide sidebar"
+          variant="ghost"
+        >
+          <PanelLeftCloseIcon />
+        </Button>
+      </div>
     </div>
     <nav className="flex-1 overflow-y-auto px-2">
       {documents.length === 0 ? (

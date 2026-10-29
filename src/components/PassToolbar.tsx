@@ -6,6 +6,8 @@ import {
   EyeOffIcon,
   HistoryIcon,
   Loader2Icon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
   PaperclipIcon,
   PlayIcon,
   TextSelectIcon,
@@ -30,12 +32,15 @@ export interface PassToolbarProps {
   readonly activeIndex: number;
   /** Number of context files attached to the document. */
   readonly contextCount: number;
+  /** True when the notes column is hidden. */
+  readonly notesCollapsed: boolean;
   onDeletePass(pass: Pass): void;
   onExportMarkdown(): void;
   onNext(): void;
   onOpenContext(): void;
   onOpenRevisions(): void;
   onPrevious(): void;
+  onToggleNotes(): void;
   onTogglePass(pass: Pass): void;
   readonly openCount: number;
   readonly passes: ReadonlyArray<Pass>;
@@ -50,12 +55,14 @@ export interface PassToolbarProps {
 export const PassToolbar = ({
   activeIndex,
   contextCount,
+  notesCollapsed,
   onDeletePass,
   onExportMarkdown,
   onNext,
   onOpenContext,
   onOpenRevisions,
   onPrevious,
+  onToggleNotes,
   onTogglePass,
   openCount,
   passes,
@@ -190,9 +197,11 @@ export const PassToolbar = ({
         </span>
         <DocumentActions
           contextCount={contextCount}
+          notesCollapsed={notesCollapsed}
           onExportMarkdown={onExportMarkdown}
           onOpenContext={onOpenContext}
           onOpenRevisions={onOpenRevisions}
+          onToggleNotes={onToggleNotes}
         />
       </div>
     </div>
@@ -201,17 +210,21 @@ export const PassToolbar = ({
 
 interface DocumentActionsProps {
   readonly contextCount: number;
+  readonly notesCollapsed: boolean;
   onExportMarkdown(): void;
   onOpenContext(): void;
   onOpenRevisions(): void;
+  onToggleNotes(): void;
 }
 
 /** Document-level buttons at the right end of the toolbar. */
 const DocumentActions = ({
   contextCount,
+  notesCollapsed,
   onExportMarkdown,
   onOpenContext,
   onOpenRevisions,
+  onToggleNotes,
 }: DocumentActionsProps) => (
   <>
     <Button
@@ -230,6 +243,16 @@ const DocumentActions = ({
     <Button onClick={onOpenRevisions} size="sm" variant="ghost">
       <HistoryIcon />
       Revisions
+    </Button>
+    <Button
+      aria-label={notesCollapsed ? "Show notes" : "Hide notes"}
+      aria-pressed={!notesCollapsed}
+      onClick={onToggleNotes}
+      size="icon-sm"
+      title={notesCollapsed ? "Show notes" : "Hide notes"}
+      variant="ghost"
+    >
+      {notesCollapsed ? <PanelRightOpenIcon /> : <PanelRightCloseIcon />}
     </Button>
   </>
 );

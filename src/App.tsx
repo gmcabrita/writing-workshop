@@ -2,6 +2,7 @@ import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Effect } from "effect";
+import { PanelLeftOpenIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
@@ -10,8 +11,10 @@ import { ContextDialog } from "@/components/ContextDialog";
 import { DocumentSidebar } from "@/components/DocumentSidebar";
 import { LeadField } from "@/components/LeadField";
 import { PassToolbar } from "@/components/PassToolbar";
+import { ResizeHandle } from "@/components/ResizeHandle";
 import { RevisionsDialog } from "@/components/RevisionsDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { exportBackup, importBackup } from "@/db/backup";
 import { db } from "@/db/database";
@@ -59,11 +62,16 @@ import {
   sortByDocumentOrder,
 } from "@/editor/suggestionActions";
 import { usePassRunner } from "@/hooks/usePassRunner";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { type ThemePreference, useTheme } from "@/hooks/useTheme";
 import { downloadTextFile, filenameStem, pickTextFile } from "@/lib/files";
 import { runtime } from "@/runtime";
 
 const ACTIVE_DOCUMENT_KEY = "writing-workshop:active-document";
+
+const SIDEBAR_COLLAPSED_KEY = "writing-workshop:sidebar-collapsed";
+
+const NOTES_COLLAPSED_KEY = "writing-workshop:notes-collapsed";
 
 /** Order the theme button cycles through. */
 const NEXT_THEME: Record<ThemePreference, ThemePreference> = {
@@ -583,12 +591,29 @@ const Workspace = ({ doc }: WorkspaceProps) => {
     [doc.id],
   );
 
+  const notesPanel = useResizableWidth({
+    defaultWidth: 320,
+    maxWidth: 640,
+    minWidth: 200,
+    side: "left",
+    storageKey: "writing-workshop:notes-width",
+  });
+
+  const [notesCollapsed, setNotesCollapsed] = useState(
+    () => localStorage.getItem(NOTES_COLLAPSED_KEY) === "true",
+  );
+
+  useEffect(() => {
+    localStorage.setItem(NOTES_COLLAPSED_KEY, String(notesCollapsed));
+  }, [notesCollapsed]);
+
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <style>{highlightStyles(activeId, hiddenPassIds)}</style>
       <PassToolbar
         activeIndex={activeIndex}
         contextCount={contextCount}
+        notesCollapsed={notesCollapsed}
         onDeletePass={(pass) => void removePass(pass)}
         onExportMarkdown={() => {
           const content = editor?.getJSON() ?? doc.content;
@@ -602,6 +627,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
         onOpenContext={() => setContextOpen(true)}
         onOpenRevisions={() => setRevisionsOpen(true)}
         onPrevious={() => step(-1)}
+        onToggleNotes={() => setNotesCollapsed((collapsed) => !collapsed)}
         onTogglePass={(pass) => void setPassHidden(pass.id, !pass.hidden)}
         openCount={navigable.length}
         passes={passes}
@@ -612,7 +638,7 @@ const Workspace = ({ doc }: WorkspaceProps) => {
       />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-6xl gap-8 px-8 py-10">
+        <div className="mx-auto flex max-w-6xl gap-6 px-8 py-10">
           <div className="min-w-0 flex-1">
             <input
               aria-label="Document title"
@@ -649,24 +675,33 @@ const Workspace = ({ doc }: WorkspaceProps) => {
               onSuggestionClick={selectFromClick}
             />
           </div>
-          <div className="w-80 shrink-0">
-            <CommentaryPanel
-              activeId={activeId}
-              editor={editor}
-              leadNotes={leadNotes}
-              onAccept={(suggestion) => void accept(suggestion)}
-              onCommentChange={(id, comment) => void updateSuggestionComment(id, comment)}
-              onDelete={(suggestion) => void remove(suggestion)}
-              onDismiss={(suggestion) => void dismiss(suggestion)}
-              onPlace={place}
-              onReopen={(suggestion) => void reopen(suggestion)}
-              onSelect={select}
-              passes={passesById}
-              resolved={resolved}
-              suggestions={orderedSuggestions}
-              unplaced={unplaced}
-            />
-          </div>
+          {notesCollapsed ? null : (
+            <>
+              <ResizeHandle
+                active={notesPanel.resizing}
+                label="Resize notes"
+                onPointerDown={notesPanel.onHandlePointerDown}
+              />
+              <div className="shrink-0" style={{ width: notesPanel.width }}>
+                <CommentaryPanel
+                  activeId={activeId}
+                  editor={editor}
+                  leadNotes={leadNotes}
+                  onAccept={(suggestion) => void accept(suggestion)}
+                  onCommentChange={(id, comment) => void updateSuggestionComment(id, comment)}
+                  onDelete={(suggestion) => void remove(suggestion)}
+                  onDismiss={(suggestion) => void dismiss(suggestion)}
+                  onPlace={place}
+                  onReopen={(suggestion) => void reopen(suggestion)}
+                  onSelect={select}
+                  passes={passesById}
+                  resolved={resolved}
+                  suggestions={orderedSuggestions}
+                  unplaced={unplaced}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -687,6 +722,19 @@ const App = () => {
   const settings = useLiveQuery(() => db.settings.get("settings"), []) ?? DEFAULT_SETTINGS;
   const [activeDocumentId, setActiveDocumentId] = useState<DocumentId | null>(readStoredDocumentId);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true",
+  );
+
+  const sidebar = useResizableWidth({
+    defaultWidth: 240,
+    maxWidth: 480,
+    minWidth: 160,
+    side: "right",
+    storageKey: "writing-workshop:sidebar-width",
+  });
+
   // Bumped after a backup restore. The workspace holds the editor content
   // and lead in local state, so it is remounted to pick up restored rows.
   const [restoreCount, setRestoreCount] = useState(0);
@@ -710,6 +758,10 @@ const App = () => {
       localStorage.setItem(ACTIVE_DOCUMENT_KEY, activeDocumentId);
     }
   }, [activeDocumentId]);
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   const create = async () => {
     const created = await createDocument("");
@@ -738,19 +790,43 @@ const App = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-      <DocumentSidebar
-        activeId={activeDocumentId}
-        documents={documents ?? []}
-        onCreate={() => void create()}
-        onCycleTheme={() => theme.setPreference(NEXT_THEME[theme.preference])}
-        onDelete={(id) => void confirmDeleteDocument(id)}
-        onExportBackup={() => void backupToFile()}
-        onImportBackup={() => void restoreBackup()}
-        onImportMarkdown={() => void importMarkdown()}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onSelect={setActiveDocumentId}
-        theme={theme.preference}
-      />
+      {sidebarCollapsed ? (
+        <div className="flex h-full shrink-0 flex-col border-r bg-sidebar p-1.5">
+          <Button
+            aria-label="Show sidebar"
+            onClick={() => setSidebarCollapsed(false)}
+            size="icon-sm"
+            title="Show sidebar"
+            variant="ghost"
+          >
+            <PanelLeftOpenIcon />
+          </Button>
+        </div>
+      ) : (
+        <>
+          <DocumentSidebar
+            activeId={activeDocumentId}
+            documents={documents ?? []}
+            onCollapse={() => setSidebarCollapsed(true)}
+            onCreate={() => void create()}
+            onCycleTheme={() => theme.setPreference(NEXT_THEME[theme.preference])}
+            onDelete={(id) => void confirmDeleteDocument(id)}
+            onExportBackup={() => void backupToFile()}
+            onImportBackup={() => void restoreBackup()}
+            onImportMarkdown={() => void importMarkdown()}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onSelect={setActiveDocumentId}
+            theme={theme.preference}
+            width={sidebar.width}
+          />
+          <ResizeHandle
+            active={sidebar.resizing}
+            className="z-10 -mx-1"
+            label="Resize sidebar"
+            onPointerDown={sidebar.onHandlePointerDown}
+          />
+        </>
+      )}
       {activeDocument === null ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           {documents === undefined ? "Loading…" : "Create a document to begin."}
