@@ -52,7 +52,7 @@ const DiffView = ({ after, before }: DiffViewProps) => {
   }
 
   return (
-    <pre className="max-h-[50vh] overflow-y-auto rounded-md border bg-muted/30 p-4 font-serif text-sm leading-relaxed whitespace-pre-wrap">
+    <pre className="max-h-[50vh] overflow-y-auto rounded-md border bg-muted/30 p-4 text-sm leading-relaxed whitespace-pre-wrap">
       {changes.map((change, index) => {
         if (change.added) {
           return (
@@ -152,7 +152,7 @@ export const RevisionCompare = ({ currentContent, revisions, selected }: Revisio
       {mode === "diff" ? (
         <DiffView after={after} before={before} />
       ) : (
-        <pre className="max-h-[50vh] overflow-y-auto rounded-md border bg-muted/30 p-4 font-serif text-sm leading-relaxed whitespace-pre-wrap">
+        <pre className="max-h-[50vh] overflow-y-auto rounded-md border bg-muted/30 p-4 text-sm leading-relaxed whitespace-pre-wrap">
           {before}
         </pre>
       )}
