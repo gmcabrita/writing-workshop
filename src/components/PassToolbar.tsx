@@ -34,14 +34,14 @@ export interface PassToolbarProps {
   readonly contextCount: number;
   /** True when the notes column is hidden. */
   readonly notesCollapsed: boolean;
-  onDeletePass(pass: Pass): void;
-  onExportMarkdown(): void;
-  onNext(): void;
-  onOpenContext(): void;
-  onOpenRevisions(): void;
-  onPrevious(): void;
-  onToggleNotes(): void;
-  onTogglePass(pass: Pass): void;
+  onDeletePass: (pass: Pass) => void;
+  onExportMarkdown: () => void;
+  onNext: () => void;
+  onOpenContext: () => void;
+  onOpenRevisions: () => void;
+  onPrevious: () => void;
+  onToggleNotes: () => void;
+  onTogglePass: (pass: Pass) => void;
   readonly openCount: number;
   readonly passes: ReadonlyArray<Pass>;
   readonly prompts: ReadonlyArray<PassPrompt>;
@@ -211,10 +211,10 @@ export const PassToolbar = ({
 interface DocumentActionsProps {
   readonly contextCount: number;
   readonly notesCollapsed: boolean;
-  onExportMarkdown(): void;
-  onOpenContext(): void;
-  onOpenRevisions(): void;
-  onToggleNotes(): void;
+  onExportMarkdown: () => void;
+  onOpenContext: () => void;
+  onOpenRevisions: () => void;
+  onToggleNotes: () => void;
 }
 
 /** Document-level buttons at the right end of the toolbar. */

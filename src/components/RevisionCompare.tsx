@@ -17,7 +17,7 @@ import { contentToMarkdown } from "@/editor/markdown";
 const CURRENT = "current";
 
 export interface RevisionCompareProps {
-  currentContent(): JSONContent;
+  currentContent: () => JSONContent;
   readonly revisions: ReadonlyArray<Revision>;
   /** Revision opened from the list; the comparison starts from it. */
   readonly selected: Revision;

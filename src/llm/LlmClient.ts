@@ -2,9 +2,12 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import type { LlmConfig } from "@/domain/model";
 
-export class LlmError extends Schema.TaggedError<LlmError>()("LlmError", {
-  message: Schema.String,
-}) {}
+export class LlmError extends Schema.TaggedError<LlmError, { readonly brand: unique symbol }>()(
+  "LlmError",
+  {
+    message: Schema.String,
+  },
+) {}
 
 export interface ChatMessage {
   readonly content: string;
@@ -128,7 +131,7 @@ export class LlmClient extends Context.Service<
           const detail = yield* Effect.try(() => JSON.parse(text)).pipe(
             Effect.flatMap(decodeErrorBody),
             Effect.map((parsed) => parsed.error.message),
-            Effect.catch(() => Effect.succeed(text.slice(0, 300))),
+            Effect.orElseSucceed(() => text.slice(0, 300)),
           );
 
           return yield* new LlmError({ message: `HTTP ${response.status}: ${detail}` });

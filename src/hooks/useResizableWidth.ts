@@ -16,7 +16,7 @@ export interface ResizableWidthOptions {
 
 export interface ResizableWidth {
   /** Attach to the drag handle's `onPointerDown`. */
-  onHandlePointerDown(event: ReactPointerEvent<HTMLElement>): void;
+  onHandlePointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   /** True while the pointer is held on the handle. */
   readonly resizing: boolean;
   readonly width: number;

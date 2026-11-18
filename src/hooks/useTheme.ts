@@ -45,7 +45,7 @@ const subscribe = (onChange: () => void): (() => void) => {
 export interface ThemeControls {
   readonly preference: ThemePreference;
   readonly resolved: ResolvedTheme;
-  setPreference(next: ThemePreference): void;
+  setPreference: (next: ThemePreference) => void;
 }
 
 export const useTheme = (): ThemeControls => {

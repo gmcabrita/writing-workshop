@@ -9,13 +9,13 @@ import { extractPdfText } from "@/lib/pdfText";
 export const CONTEXT_FILE_ACCEPT =
   ".pdf,.md,.markdown,.html,.htm,.txt,application/pdf,text/markdown,text/html,text/plain";
 
-export class ContextImportError extends Schema.TaggedError<ContextImportError>()(
-  "ContextImportError",
-  {
-    fileName: Schema.String,
-    message: Schema.String,
-  },
-) {}
+export class ContextImportError extends Schema.TaggedError<
+  ContextImportError,
+  { readonly brand: unique symbol }
+>()("ContextImportError", {
+  fileName: Schema.String,
+  message: Schema.String,
+}) {}
 
 const KIND_BY_EXTENSION: ReadonlyMap<string, ContextFileKind> = new Map([
   ["htm", "html"],

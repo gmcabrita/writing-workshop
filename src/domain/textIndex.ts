@@ -11,9 +11,9 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 export interface TextIndex {
   readonly text: string;
   /** Convert a ProseMirror position into a plain text offset (clamped to text). */
-  toOffset(pos: number): number;
+  toOffset: (pos: number) => number;
   /** Convert a plain text offset into a ProseMirror position. */
-  toPos(offset: number): number;
+  toPos: (offset: number) => number;
 }
 
 interface TextSegment {

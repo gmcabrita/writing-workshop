@@ -6,7 +6,7 @@ export interface ResizeHandleProps {
   readonly active: boolean;
   readonly className?: string;
   readonly label: string;
-  onPointerDown(event: ReactPointerEvent<HTMLElement>): void;
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
 /**
@@ -25,6 +25,7 @@ export const ResizeHandle = ({ active, className, label, onPointerDown }: Resize
       className,
     )}
     onPointerDown={onPointerDown}
+    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ARIA models a resize handle as role="separator"; a void `hr` cannot render the `::after` line.
     role="separator"
   />
 );

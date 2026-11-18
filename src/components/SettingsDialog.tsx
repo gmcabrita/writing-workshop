@@ -39,7 +39,7 @@ import {
 } from "@/domain/model";
 
 export interface SettingsDialogProps {
-  onOpenChange(open: boolean): void;
+  onOpenChange: (open: boolean) => void;
   readonly open: boolean;
   readonly settings: Settings;
 }
@@ -62,10 +62,11 @@ const testConnection = (config: LlmConfig): Effect.Effect<ConnectionTest, never,
 
     return { kind: "ok", ms: Date.now() - started, reply: reply.trim().slice(0, 80) } as const;
   }).pipe(
-    Effect.timeout("30 seconds"),
-    Effect.catchTag("TimeoutError", () =>
-      Effect.succeed({ kind: "failed", message: "No reply within 30 seconds." } as const),
-    ),
+    Effect.timeoutOrElse({
+      duration: "30 seconds",
+      orElse: () =>
+        Effect.succeed({ kind: "failed", message: "No reply within 30 seconds." } as const),
+    }),
     Effect.catchTag("LlmError", (error) =>
       Effect.succeed({ kind: "failed", message: error.message } as const),
     ),

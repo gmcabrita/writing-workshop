@@ -24,8 +24,8 @@
     "noFallthroughCasesInSwitch": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    "plugins": [{ "diagnostics": false, "name": "@effect/language-service" }]
   },
-  "include": ["src"],
-  "exclude": ["tools/oxlint/anti-slop"]
+  "include": ["src"]
 }

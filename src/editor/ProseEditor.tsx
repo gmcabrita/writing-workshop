@@ -29,18 +29,18 @@ const SAVE_DEBOUNCE_MS = 400;
 export interface ProseEditorProps {
   readonly initialContent: JSONContent;
   /** Called when the writer asks to annotate the current selection. */
-  onAnnotate(range: TextRange, quote: string): void;
-  onChange(content: JSONContent): void;
-  onReady(editor: Editor | null): void;
+  onAnnotate: (range: TextRange, quote: string) => void;
+  onChange: (content: JSONContent) => void;
+  onReady: (editor: Editor | null) => void;
   /** Highlights under the click, shortest span first. */
-  onSuggestionClick(ids: ReadonlyArray<SuggestionId>): void;
+  onSuggestionClick: (ids: ReadonlyArray<SuggestionId>) => void;
 }
 
 interface ToolbarButtonProps {
   readonly active: boolean;
   readonly icon: typeof BoldIcon;
   readonly label: string;
-  onClick(): void;
+  onClick: () => void;
 }
 
 const ToolbarButton = ({ active, icon: Icon, label, onClick }: ToolbarButtonProps) => (
@@ -224,6 +224,7 @@ export const ProseEditor = ({
           >
             <input
               aria-label="Link URL"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- The user opened link editing, so focus moves to the field.
               autoFocus
               className="h-7 w-64 rounded-md border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
               onChange={(event) => setLinkDraft(event.target.value)}

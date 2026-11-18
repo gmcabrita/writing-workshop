@@ -23,10 +23,10 @@ import { cn } from "@/lib/utils";
 
 export interface RevisionsDialogProps {
   /** Snapshot source: the live editor content. */
-  currentContent(): JSONContent;
+  currentContent: () => JSONContent;
   readonly documentId: DocumentId;
-  onOpenChange(open: boolean): void;
-  onRestore(revision: Revision): void;
+  onOpenChange: (open: boolean) => void;
+  onRestore: (revision: Revision) => void;
   readonly open: boolean;
 }
 
@@ -45,8 +45,8 @@ const RevisionRow = ({
   revision,
 }: {
   readonly comparing: boolean;
-  onCompare(revision: Revision): void;
-  onRestore(revision: Revision): void;
+  onCompare: (revision: Revision) => void;
+  onRestore: (revision: Revision) => void;
   readonly revision: Revision;
 }) => (
   <li

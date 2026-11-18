@@ -33,13 +33,13 @@ export interface CommentaryPanelProps {
   readonly editor: Editor | null;
   /** Open notes about the lead. Shown first; they have no highlight to anchor to. */
   readonly leadNotes: ReadonlyArray<Suggestion>;
-  onAccept(suggestion: Suggestion): void;
-  onCommentChange(id: SuggestionId, comment: string): void;
-  onDelete(suggestion: Suggestion): void;
-  onDismiss(suggestion: Suggestion): void;
-  onPlace(suggestion: Suggestion): void;
-  onReopen(suggestion: Suggestion): void;
-  onSelect(id: SuggestionId): void;
+  onAccept: (suggestion: Suggestion) => void;
+  onCommentChange: (id: SuggestionId, comment: string) => void;
+  onDelete: (suggestion: Suggestion) => void;
+  onDismiss: (suggestion: Suggestion) => void;
+  onPlace: (suggestion: Suggestion) => void;
+  onReopen: (suggestion: Suggestion) => void;
+  onSelect: (id: SuggestionId) => void;
   readonly passes: ReadonlyMap<PassId, Pass>;
   /** Accepted or dismissed notes, newest first. */
   readonly resolved: ReadonlyArray<Suggestion>;
@@ -77,8 +77,8 @@ const measureAnchors = (
 };
 
 interface CardActionsProps {
-  onAccept(suggestion: Suggestion): void;
-  onDismiss(suggestion: Suggestion): void;
+  onAccept: (suggestion: Suggestion) => void;
+  onDismiss: (suggestion: Suggestion) => void;
   /** Present for unplaced notes: attach the note to the current selection. */
   onPlace: ((suggestion: Suggestion) => void) | null;
   readonly suggestion: Suggestion;
@@ -140,7 +140,7 @@ const ReplacementPreview = ({ replacement }: { readonly replacement: string }) =
 interface CardBodyProps {
   readonly active: boolean;
   readonly isManual: boolean;
-  onCommentChange(id: SuggestionId, comment: string): void;
+  onCommentChange: (id: SuggestionId, comment: string) => void;
   readonly suggestion: Suggestion;
 }
 
@@ -176,13 +176,13 @@ const CardBody = ({ active, isManual, onCommentChange, suggestion }: CardBodyPro
 
 interface CommentaryCardProps {
   readonly active: boolean;
-  onAccept(suggestion: Suggestion): void;
-  onCommentChange(id: SuggestionId, comment: string): void;
-  onDelete(suggestion: Suggestion): void;
-  onDismiss(suggestion: Suggestion): void;
-  onMeasure(id: SuggestionId, height: number): void;
+  onAccept: (suggestion: Suggestion) => void;
+  onCommentChange: (id: SuggestionId, comment: string) => void;
+  onDelete: (suggestion: Suggestion) => void;
+  onDismiss: (suggestion: Suggestion) => void;
+  onMeasure: (id: SuggestionId, height: number) => void;
   onPlace: ((suggestion: Suggestion) => void) | null;
-  onSelect(id: SuggestionId): void;
+  onSelect: (id: SuggestionId) => void;
   readonly pass: Pass | undefined;
   readonly suggestion: Suggestion;
   /** Pixel offset for pinned cards; null renders the card in normal flow. */
@@ -220,6 +220,8 @@ const CommentaryCard = ({
   }, [onMeasure, suggestion.id]);
 
   return (
+    // Click selection is a pointer shortcut. The card holds buttons and a textarea, so it cannot take role="button".
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
       className={cn(
         "commentary-card rounded-lg border bg-card p-3 text-sm shadow-xs transition-[top,box-shadow] duration-200",
@@ -271,7 +273,7 @@ const CommentaryCard = ({
 };
 
 interface ResolvedListProps {
-  onReopen(suggestion: Suggestion): void;
+  onReopen: (suggestion: Suggestion) => void;
   readonly passes: ReadonlyMap<PassId, Pass>;
   readonly resolved: ReadonlyArray<Suggestion>;
 }

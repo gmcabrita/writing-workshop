@@ -10,13 +10,13 @@ import {
 } from "@/domain/model";
 import { type ChatMessage, LlmClient, type LlmError } from "@/llm/LlmClient";
 
-export class WorkshopParseError extends Schema.TaggedError<WorkshopParseError>()(
-  "WorkshopParseError",
-  {
-    message: Schema.String,
-    raw: Schema.String,
-  },
-) {}
+export class WorkshopParseError extends Schema.TaggedError<
+  WorkshopParseError,
+  { readonly brand: unique symbol }
+>()("WorkshopParseError", {
+  message: Schema.String,
+  raw: Schema.String,
+}) {}
 
 /** What the model is asked to return. Lenient on optional fields. */
 const ModelSuggestion = Schema.Struct({

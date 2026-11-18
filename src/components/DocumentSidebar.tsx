@@ -39,15 +39,15 @@ const THEME_LABEL: Record<ThemePreference, string> = {
 export interface DocumentSidebarProps {
   readonly activeId: DocumentId | null;
   readonly documents: ReadonlyArray<WorkshopDocument>;
-  onCollapse(): void;
-  onCreate(): void;
-  onCycleTheme(): void;
-  onDelete(id: DocumentId): void;
-  onExportBackup(): void;
-  onImportBackup(): void;
-  onImportMarkdown(): void;
-  onOpenSettings(): void;
-  onSelect(id: DocumentId): void;
+  onCollapse: () => void;
+  onCreate: () => void;
+  onCycleTheme: () => void;
+  onDelete: (id: DocumentId) => void;
+  onExportBackup: () => void;
+  onImportBackup: () => void;
+  onImportMarkdown: () => void;
+  onOpenSettings: () => void;
+  onSelect: (id: DocumentId) => void;
   readonly theme: ThemePreference;
   /** Pixel width. The parent owns it so the drag handle can change it. */
   readonly width: number;

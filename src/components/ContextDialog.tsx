@@ -26,7 +26,7 @@ import { runtime } from "@/runtime";
 
 export interface ContextDialogProps {
   readonly documentId: DocumentId;
-  onOpenChange(open: boolean): void;
+  onOpenChange: (open: boolean) => void;
   readonly open: boolean;
 }
 

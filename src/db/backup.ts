@@ -25,22 +25,25 @@ import {
  */
 export const BACKUP_VERSION = 1;
 
-export class BackupParseError extends Schema.TaggedError<BackupParseError>()("BackupParseError", {
+export class BackupParseError extends Schema.TaggedError<
+  BackupParseError,
+  { readonly brand: unique symbol }
+>()("BackupParseError", {
   message: Schema.String,
 }) {}
 
 const DocumentSchema = Schema.Struct({
   content: Schema.Json,
-  createdAt: Schema.Number,
+  createdAt: Schema.Finite,
   id: Schema.String,
   // Added with the lead feature; older backups omit it.
   lead: Schema.optional(Schema.String),
   title: Schema.String,
-  updatedAt: Schema.Number,
+  updatedAt: Schema.Finite,
 });
 
 const ContextFileSchema = Schema.Struct({
-  createdAt: Schema.Number,
+  createdAt: Schema.Finite,
   documentId: Schema.String,
   id: Schema.String,
   kind: Schema.Literals(["pdf", "html", "markdown", "text"]),
@@ -50,7 +53,7 @@ const ContextFileSchema = Schema.Struct({
 
 const RevisionSchema = Schema.Struct({
   content: Schema.Json,
-  createdAt: Schema.Number,
+  createdAt: Schema.Finite,
   documentId: Schema.String,
   id: Schema.String,
   label: Schema.String,
@@ -58,7 +61,7 @@ const RevisionSchema = Schema.Struct({
 });
 
 const PassSchema = Schema.Struct({
-  createdAt: Schema.Number,
+  createdAt: Schema.Finite,
   documentId: Schema.String,
   error: Schema.NullOr(Schema.String),
   // Added after the first release; older backups omit it.
@@ -66,15 +69,15 @@ const PassSchema = Schema.Struct({
   id: Schema.String,
   promptName: Schema.String,
   status: Schema.Literals(["running", "done", "error"]),
-  tone: Schema.Number,
+  tone: Schema.Finite,
 });
 
 const SuggestionSchema = Schema.Struct({
   comment: Schema.String,
-  createdAt: Schema.Number,
+  createdAt: Schema.Finite,
   documentId: Schema.String,
   id: Schema.String,
-  order: Schema.Number,
+  order: Schema.Finite,
   passId: Schema.String,
   quote: Schema.String,
   replacement: Schema.NullOr(Schema.String),
@@ -86,20 +89,20 @@ const SuggestionSchema = Schema.Struct({
 const PassPromptSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  order: Schema.Number,
+  order: Schema.Finite,
   prompt: Schema.String,
 });
 
 const SettingsSchema = Schema.Struct({
   id: Schema.Literal("settings"),
   // Added with the lead feature; older backups omit it.
-  leadMaxLength: Schema.optional(Schema.Number),
+  leadMaxLength: Schema.optional(Schema.Finite),
   llm: Schema.Struct({
     apiKey: Schema.String,
     baseUrl: Schema.String,
     jsonMode: Schema.Boolean,
     model: Schema.String,
-    temperature: Schema.Number,
+    temperature: Schema.Finite,
   }),
   systemPrompt: Schema.String,
 });
@@ -108,7 +111,7 @@ const BackupSchema = Schema.Struct({
   // Added with the context feature; older backups omit it.
   contextFiles: Schema.optional(Schema.Array(ContextFileSchema)),
   documents: Schema.Array(DocumentSchema),
-  exportedAt: Schema.Number,
+  exportedAt: Schema.Finite,
   passes: Schema.Array(PassSchema),
   passPrompts: Schema.Array(PassPromptSchema),
   revisions: Schema.Array(RevisionSchema),

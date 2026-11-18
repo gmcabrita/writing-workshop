@@ -21,7 +21,7 @@ export interface SlashCommandItem {
   readonly description: string;
   readonly icon: LucideIcon;
   readonly keywords: ReadonlyArray<string>;
-  run(editor: Editor, range: Range): void;
+  run: (editor: Editor, range: Range) => void;
   readonly title: string;
 }
 
@@ -109,12 +109,12 @@ const filterCommands = (query: string): Array<SlashCommandItem> => {
 };
 
 interface SlashMenuProps {
-  command(item: SlashCommandItem): void;
+  command: (item: SlashCommandItem) => void;
   readonly items: ReadonlyArray<SlashCommandItem>;
 }
 
 export interface SlashMenuHandle {
-  onKeyDown(props: SuggestionKeyDownProps): boolean;
+  onKeyDown: (props: SuggestionKeyDownProps) => boolean;
 }
 
 const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(({ command, items }, ref) => {
@@ -166,6 +166,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(({ command, items 
   return (
     <div className="w-72 overflow-hidden rounded-lg border bg-popover p-1 shadow-md">
       {items.map((item, index) => (
+        // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- The rule cannot see the `item.title` text label.
         <button
           className={cn(
             "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm",

@@ -27,9 +27,9 @@ export interface RunningPass {
 }
 
 export interface PassRunner {
-  cancel(): void;
+  cancel: () => void;
   /** `scope` limits the pass to a document range (the writer's selection). */
-  run(prompt: PassPrompt, scope: TextRange | null): Promise<void>;
+  run: (prompt: PassPrompt, scope: TextRange | null) => Promise<void>;
   readonly running: RunningPass | null;
 }
 

@@ -6,7 +6,7 @@ export interface LeadFieldProps {
   /** Tone of the active lead note's pass, or null when no lead note is active. */
   readonly activeTone: number | null;
   readonly maxLength: number;
-  onChange(lead: string): void;
+  onChange: (lead: string) => void;
   /** Outer element, so the workspace can scroll the lead into view. */
   readonly ref: RefObject<HTMLDivElement | null>;
   readonly value: string;

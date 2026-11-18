@@ -113,7 +113,7 @@ const restoreFromFile = async (): Promise<boolean> => {
           ),
         ),
       ),
-      Effect.map(() => true),
+      Effect.as(true),
       Effect.catch((error) =>
         Effect.sync(() => {
           toast.error(error.message);
