@@ -2,7 +2,6 @@ import {
   DownloadIcon,
   FileTextIcon,
   FileUpIcon,
-  type LucideIcon,
   MonitorIcon,
   MoonIcon,
   PanelLeftCloseIcon,
@@ -12,6 +11,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { DocumentId, WorkshopDocument } from "@/domain/model";

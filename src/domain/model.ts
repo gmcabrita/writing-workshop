@@ -13,26 +13,26 @@ export type PassPromptId = string & { readonly __brand: "PassPromptId" };
 
 export type ContextFileId = string & { readonly __brand: "ContextFileId" };
 
-// SAFETY: a fresh UUID is a valid DocumentId; the brand only prevents mixing id kinds.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fresh UUID is a valid DocumentId; the brand only prevents mixing id kinds.
 export const newDocumentId = (): DocumentId => crypto.randomUUID() as DocumentId;
 
-// SAFETY: a fresh UUID is a valid RevisionId; the brand only prevents mixing id kinds.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fresh UUID is a valid RevisionId; the brand only prevents mixing id kinds.
 export const newRevisionId = (): RevisionId => crypto.randomUUID() as RevisionId;
 
-// SAFETY: a fresh UUID is a valid PassId; the brand only prevents mixing id kinds.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fresh UUID is a valid PassId; the brand only prevents mixing id kinds.
 export const newPassId = (): PassId => crypto.randomUUID() as PassId;
 
-// SAFETY: a fresh UUID is a valid SuggestionId; the brand only prevents mixing id kinds.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fresh UUID is a valid SuggestionId; the brand only prevents mixing id kinds.
 export const newSuggestionId = (): SuggestionId => crypto.randomUUID() as SuggestionId;
 
-// SAFETY: a fresh UUID is a valid PassPromptId; the brand only prevents mixing id kinds.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fresh UUID is a valid PassPromptId; the brand only prevents mixing id kinds.
 export const newPassPromptId = (): PassPromptId => crypto.randomUUID() as PassPromptId;
 
-// SAFETY: a fresh UUID is a valid ContextFileId; the brand only prevents mixing id kinds.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a fresh UUID is a valid ContextFileId; the brand only prevents mixing id kinds.
 export const newContextFileId = (): ContextFileId => crypto.randomUUID() as ContextFileId;
 
 /** Id of the synthetic pass that holds annotations the writer adds by hand. */
-// SAFETY: "manual" is reserved and never produced by newPassId (UUIDs contain dashes).
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- "manual" is reserved and never produced by newPassId (UUIDs contain dashes).
 export const MANUAL_PASS_ID = "manual" as PassId;
 
 /**

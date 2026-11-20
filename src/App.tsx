@@ -36,20 +36,20 @@ import {
   setSuggestionStatus,
   updateSuggestionComment,
 } from "@/db/repo";
-import {
-  DEFAULT_SETTINGS,
-  type DocumentId,
-  MANUAL_PASS_ID,
-  type Pass,
-  type PassId,
-  type PassPrompt,
-  type Revision,
-  type Suggestion,
-  type SuggestionId,
-  type WorkshopDocument,
+import { DEFAULT_SETTINGS, MANUAL_PASS_ID } from "@/domain/model";
+import type {
+  DocumentId,
+  Pass,
+  PassId,
+  PassPrompt,
+  Revision,
+  Suggestion,
+  SuggestionId,
+  WorkshopDocument,
 } from "@/domain/model";
 import { applyLeadReplacement } from "@/domain/leadNotes";
-import { buildTextIndex, type TextRange } from "@/domain/textIndex";
+import { buildTextIndex } from "@/domain/textIndex";
+import type { TextRange } from "@/domain/textIndex";
 import { formatStats, textStats } from "@/domain/wordCount";
 import { contentToMarkdown, markdownToContent } from "@/editor/markdown";
 import { ProseEditor } from "@/editor/ProseEditor";
@@ -63,7 +63,8 @@ import {
 } from "@/editor/suggestionActions";
 import { usePassRunner } from "@/hooks/usePassRunner";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
-import { type ThemePreference, useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/useTheme";
+import type { ThemePreference } from "@/hooks/useTheme";
 import { downloadTextFile, filenameStem, pickTextFile } from "@/lib/files";
 import { runtime } from "@/runtime";
 
@@ -148,7 +149,7 @@ const manualPass = (documentId: DocumentId): Pass => ({
 const readStoredDocumentId = (): DocumentId | null => {
   const stored = localStorage.getItem(ACTIVE_DOCUMENT_KEY);
 
-  // SAFETY: this key is only ever written with a DocumentId; a stale id is harmless.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- this key is only ever written with a DocumentId; a stale id is harmless.
   return stored === null ? null : (stored as DocumentId);
 };
 

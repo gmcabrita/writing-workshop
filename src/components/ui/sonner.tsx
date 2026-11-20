@@ -6,7 +6,8 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import type { CSSProperties } from "react";
-import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { Toaster as Sonner } from "sonner";
+import type { ToasterProps } from "sonner";
 
 // Sonner reads its colours from CSS custom properties. React's CSSProperties
 // type does not include custom properties, so they are declared here.

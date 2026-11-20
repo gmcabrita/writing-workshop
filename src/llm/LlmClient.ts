@@ -25,14 +25,14 @@ const ChatCompletionResponse = Schema.Struct({
   ),
 });
 
-const decodeChatCompletion = Schema.decodeUnknownEffect(ChatCompletionResponse);
+const decodeChatCompletion = Schema.decodeEffect(Schema.fromJsonString(ChatCompletionResponse));
 
 /** Error body many OpenAI-compatible servers return. Used to surface a readable message. */
 const ErrorBody = Schema.Struct({
   error: Schema.Struct({ message: Schema.String }),
 });
 
-const decodeErrorBody = Schema.decodeUnknownEffect(ErrorBody);
+const decodeErrorBody = Schema.decodeEffect(Schema.fromJsonString(ErrorBody));
 
 const trimTrailingSlash = (url: string): string => url.replace(/\/+$/, "");
 
@@ -128,8 +128,7 @@ export class LlmClient extends Context.Service<
         });
 
         if (!response.ok) {
-          const detail = yield* Effect.try(() => JSON.parse(text)).pipe(
-            Effect.flatMap(decodeErrorBody),
+          const detail = yield* decodeErrorBody(text).pipe(
             Effect.map((parsed) => parsed.error.message),
             Effect.orElseSucceed(() => text.slice(0, 300)),
           );
@@ -137,8 +136,7 @@ export class LlmClient extends Context.Service<
           return yield* new LlmError({ message: `HTTP ${response.status}: ${detail}` });
         }
 
-        const parsed = yield* Effect.try(() => JSON.parse(text)).pipe(
-          Effect.flatMap(decodeChatCompletion),
+        const parsed = yield* decodeChatCompletion(text).pipe(
           Effect.mapError(
             () => new LlmError({ message: "Response was not a chat completion object." }),
           ),

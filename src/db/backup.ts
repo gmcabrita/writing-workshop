@@ -2,21 +2,21 @@ import type { JSONContent } from "@tiptap/core";
 import { Effect, Schema } from "effect";
 
 import { db } from "@/db/database";
-import {
-  type ContextFile,
-  type ContextFileId,
-  DEFAULT_LEAD_MAX_LENGTH,
-  type DocumentId,
-  type Pass,
-  type PassId,
-  type PassPrompt,
-  type PassPromptId,
-  type Revision,
-  type RevisionId,
-  type Settings,
-  type Suggestion,
-  type SuggestionId,
-  type WorkshopDocument,
+import { DEFAULT_LEAD_MAX_LENGTH } from "@/domain/model";
+import type {
+  ContextFile,
+  ContextFileId,
+  DocumentId,
+  Pass,
+  PassId,
+  PassPrompt,
+  PassPromptId,
+  Revision,
+  RevisionId,
+  Settings,
+  Suggestion,
+  SuggestionId,
+  WorkshopDocument,
 } from "@/domain/model";
 
 /**
@@ -124,6 +124,8 @@ type Backup = typeof BackupSchema.Type;
 
 const decodeBackup = Schema.decodeUnknownEffect(BackupSchema);
 
+const parseJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 export const exportBackup = async (): Promise<string> => {
   const [documents, revisions, passes, suggestions, passPrompts, contextFiles, settings] =
     await Promise.all([
@@ -172,47 +174,47 @@ export interface ImportSummary {
 const toDomain = (backup: Backup) => ({
   contextFiles: (backup.contextFiles ?? []).map((file): ContextFile => ({
     ...file,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     documentId: file.documentId as DocumentId,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     id: file.id as ContextFileId,
   })),
   documents: backup.documents.map((document): WorkshopDocument => ({
     ...document,
-    // SAFETY: Schema.Json validated the value; the editor schema re-validates on load.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Schema.Json validated the value; the editor schema re-validates on load.
     content: document.content as JSONContent,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     id: document.id as DocumentId,
     lead: document.lead ?? "",
   })),
   passes: backup.passes.map((pass): Pass => ({
     ...pass,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     documentId: pass.documentId as DocumentId,
     hidden: pass.hidden ?? false,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     id: pass.id as PassId,
   })),
   passPrompts: backup.passPrompts.map(
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     (prompt): PassPrompt => ({ ...prompt, id: prompt.id as PassPromptId }),
   ),
   revisions: backup.revisions.map((revision): Revision => ({
     ...revision,
-    // SAFETY: Schema.Json validated the value; the editor schema re-validates on load.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Schema.Json validated the value; the editor schema re-validates on load.
     content: revision.content as JSONContent,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     documentId: revision.documentId as DocumentId,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     id: revision.id as RevisionId,
   })),
   suggestions: backup.suggestions.map((suggestion): Suggestion => ({
     ...suggestion,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     documentId: suggestion.documentId as DocumentId,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     id: suggestion.id as SuggestionId,
-    // SAFETY: ids were produced by this app's exporter.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ids were produced by this app's exporter.
     passId: suggestion.passId as PassId,
     target: suggestion.target ?? "document",
   })),
@@ -223,10 +225,8 @@ const toDomain = (backup: Backup) => ({
  * importing the same file twice is harmless. The current API key is kept.
  */
 export const importBackup = (text: string): Effect.Effect<ImportSummary, BackupParseError> =>
-  Effect.try({
-    catch: () => new BackupParseError({ message: "The file is not JSON." }),
-    try: () => JSON.parse(text),
-  }).pipe(
+  parseJson(text).pipe(
+    Effect.mapError(() => new BackupParseError({ message: "The file is not JSON." })),
     Effect.flatMap((json) =>
       decodeBackup(json).pipe(
         Effect.mapError(

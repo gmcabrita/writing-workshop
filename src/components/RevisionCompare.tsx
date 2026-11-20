@@ -108,7 +108,7 @@ export const RevisionCompare = ({ currentContent, revisions, selected }: Revisio
           <Label htmlFor="compare-against">To</Label>
           <Select
             onValueChange={(value) => {
-              // SAFETY: option values are CURRENT or RevisionIds rendered below.
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- option values are CURRENT or RevisionIds rendered below.
               setAgainstId(value as RevisionId | typeof CURRENT);
             }}
             value={againstId}

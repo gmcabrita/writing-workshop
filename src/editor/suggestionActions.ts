@@ -2,7 +2,8 @@ import type { Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
 import type { PassId, Suggestion, SuggestionId } from "@/domain/model";
-import { buildTextIndex, resolveQuoteRange, type TextRange } from "@/domain/textIndex";
+import { buildTextIndex, resolveQuoteRange } from "@/domain/textIndex";
+import type { TextRange } from "@/domain/textIndex";
 import { findSuggestionRanges } from "@/editor/SuggestionMark";
 
 /** Plain text of a document range, with block boundaries as newlines. */

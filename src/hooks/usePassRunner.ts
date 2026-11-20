@@ -14,7 +14,8 @@ import {
 } from "@/db/repo";
 import { retargetLeadDrafts } from "@/domain/leadNotes";
 import type { DocumentId, PassId, PassPrompt, Settings, SuggestionDraft } from "@/domain/model";
-import { buildTextIndex, type TextRange } from "@/domain/textIndex";
+import { buildTextIndex } from "@/domain/textIndex";
+import type { TextRange } from "@/domain/textIndex";
 import { applySuggestionMarks, textInRange } from "@/editor/suggestionActions";
 import { Workshop } from "@/llm/Workshop";
 import { runtime } from "@/runtime";

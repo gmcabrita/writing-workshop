@@ -80,7 +80,7 @@ export const PassToolbar = ({
     <div className="flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur">
       <Select
         onValueChange={(value) => {
-          // SAFETY: option values are rendered from PassPrompt ids only.
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- option values are rendered from PassPrompt ids only.
           setSelectedId(value as PassPromptId);
         }}
         value={selected?.id ?? ""}

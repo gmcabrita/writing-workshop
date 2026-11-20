@@ -1,6 +1,8 @@
-import { type Editor, Extension, type Range } from "@tiptap/core";
+import { Extension } from "@tiptap/core";
+import type { Editor, Range } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
-import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
+import Suggestion from "@tiptap/suggestion";
+import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 import {
   Code2Icon,
   Heading1Icon,
@@ -8,11 +10,11 @@ import {
   Heading3Icon,
   ListIcon,
   ListOrderedIcon,
-  type LucideIcon,
   MinusIcon,
   PilcrowIcon,
   TextQuoteIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { forwardRef, useImperativeHandle, useState } from "react";
 
 import { cn } from "@/lib/utils";

@@ -1,14 +1,15 @@
-import Dexie, { type EntityTable } from "dexie";
+import Dexie from "dexie";
+import type { EntityTable } from "dexie";
 
-import {
-  type ContextFile,
-  DEFAULT_LEAD_MAX_LENGTH,
-  type Pass,
-  type PassPrompt,
-  type Revision,
-  type Settings,
-  type Suggestion,
-  type WorkshopDocument,
+import { DEFAULT_LEAD_MAX_LENGTH } from "@/domain/model";
+import type {
+  ContextFile,
+  Pass,
+  PassPrompt,
+  Revision,
+  Settings,
+  Suggestion,
+  WorkshopDocument,
 } from "@/domain/model";
 
 /**

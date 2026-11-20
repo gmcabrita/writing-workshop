@@ -33,10 +33,8 @@ import {
   DEFAULT_LEAD_MAX_LENGTH,
   DEFAULT_SYSTEM_PROMPT,
   RESPONSE_FORMAT_INSTRUCTIONS,
-  type LlmConfig,
-  type PassPrompt,
-  type Settings,
 } from "@/domain/model";
+import type { LlmConfig, PassPrompt, Settings } from "@/domain/model";
 
 export interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;

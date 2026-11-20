@@ -1,4 +1,5 @@
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
 export interface ResizableWidthOptions {
   readonly defaultWidth: number;

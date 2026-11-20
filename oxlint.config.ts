@@ -1,3 +1,4 @@
+import cloudflareConfig from "@cloudflare/oxlint-config";
 import { recommended as effectRecommended } from "@effect/tsgo/oxlint-presets";
 import nkzwConfig from "@nkzw/oxlint-config/with-sorting";
 import { defineConfig } from "oxlint";
@@ -6,7 +7,11 @@ export default defineConfig({
   categories: {
     correctness: "error",
   },
-  extends: [nkzwConfig, effectRecommended],
+  // `extends` drops preset envs, so they are declared here.
+  env: {
+    browser: true,
+  },
+  extends: [nkzwConfig, cloudflareConfig, effectRecommended],
   ignorePatterns: [
     ".agent/**",
     ".agents/**",

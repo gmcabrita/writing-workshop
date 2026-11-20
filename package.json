@@ -40,6 +40,7 @@
     "sonner": "^2.0.8"
   },
   "devDependencies": {
+    "@cloudflare/oxlint-config": "^0.1.0",
     "@effect/tsgo": "^0.70.0",
     "@nkzw/oxlint-config": "^3.0.0",
     "@tailwindcss/vite": "^4.3.3",

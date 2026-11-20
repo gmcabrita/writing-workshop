@@ -1,25 +1,14 @@
 import type { Editor } from "@tiptap/core";
 import { CheckIcon, MapPinIcon, RotateCcwIcon, Trash2Icon, XIcon } from "lucide-react";
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { type LayoutItem, layoutCommentary } from "@/domain/commentaryLayout";
-import {
-  MANUAL_PASS_ID,
-  type Pass,
-  type PassId,
-  type Suggestion,
-  type SuggestionId,
-} from "@/domain/model";
+import { layoutCommentary } from "@/domain/commentaryLayout";
+import type { LayoutItem } from "@/domain/commentaryLayout";
+import { MANUAL_PASS_ID } from "@/domain/model";
+import type { Pass, PassId, Suggestion, SuggestionId } from "@/domain/model";
 import { cn } from "@/lib/utils";
 
 /** Vertical space between stacked cards. */

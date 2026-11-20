@@ -151,7 +151,7 @@ export const ProseEditor = ({
   useEffect(() => {
     openLinkRef.current = () => {
       if (editor !== null && !editor.state.selection.empty) {
-        const href = editor.getAttributes("link").href;
+        const href: unknown = editor.getAttributes("link").href;
         setLinkDraft(Predicate.isString(href) ? href : "");
         setLinkEditing(true);
       }
@@ -178,7 +178,7 @@ export const ProseEditor = ({
   }
 
   const openLinkEditor = () => {
-    const href = editor.getAttributes("link").href;
+    const href: unknown = editor.getAttributes("link").href;
     setLinkDraft(Predicate.isString(href) ? href : "");
     setLinkEditing(true);
   };

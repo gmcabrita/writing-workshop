@@ -1,4 +1,5 @@
-import { type Extensions, generateJSON, type JSONContent } from "@tiptap/core";
+import { generateJSON } from "@tiptap/core";
+import type { Extensions, JSONContent } from "@tiptap/core";
 import { TableKit } from "@tiptap/extension-table";
 import { MarkdownManager } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";

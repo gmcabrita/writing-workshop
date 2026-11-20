@@ -73,7 +73,7 @@ export const suggestionIdsAt = (doc: ProseMirrorNode, pos: number): ReadonlyArra
 
   const ids = marks.flatMap((mark) =>
     mark.type.name === SUGGESTION_MARK_NAME && Predicate.isString(mark.attrs.id)
-      ? // SAFETY: the mark's `id` attribute is only ever written from a SuggestionId.
+      ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the mark's `id` attribute is only ever written from a SuggestionId.
         [mark.attrs.id as SuggestionId]
       : [],
   );
@@ -88,7 +88,7 @@ export const collectSuggestionIds = (doc: ProseMirrorNode): Set<SuggestionId> =>
   doc.descendants((node) => {
     for (const mark of node.marks) {
       if (mark.type.name === SUGGESTION_MARK_NAME && Predicate.isString(mark.attrs.id)) {
-        // SAFETY: the mark's `id` attribute is only ever written from a SuggestionId.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the mark's `id` attribute is only ever written from a SuggestionId.
         ids.add(mark.attrs.id as SuggestionId);
       }
     }
@@ -109,12 +109,16 @@ export const SuggestionMark = Mark.create({
       id: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-suggestion-id"),
-        renderHTML: (attributes) => ({ "data-suggestion-id": attributes.id }),
+        renderHTML: (attributes) => ({
+          "data-suggestion-id": Predicate.isString(attributes.id) ? attributes.id : null,
+        }),
       },
       passId: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-pass-id"),
-        renderHTML: (attributes) => ({ "data-pass-id": attributes.passId }),
+        renderHTML: (attributes) => ({
+          "data-pass-id": Predicate.isString(attributes.passId) ? attributes.passId : null,
+        }),
       },
       tone: {
         default: 0,

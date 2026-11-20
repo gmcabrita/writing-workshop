@@ -1,14 +1,15 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
-import {
-  type ContextFile,
-  type LlmConfig,
-  type PriorNote,
-  RESPONSE_FORMAT_INSTRUCTIONS,
-  type SuggestionDraft,
-  type SuggestionTarget,
+import { RESPONSE_FORMAT_INSTRUCTIONS } from "@/domain/model";
+import type {
+  ContextFile,
+  LlmConfig,
+  PriorNote,
+  SuggestionDraft,
+  SuggestionTarget,
 } from "@/domain/model";
-import { type ChatMessage, LlmClient, type LlmError } from "@/llm/LlmClient";
+import { LlmClient } from "@/llm/LlmClient";
+import type { ChatMessage, LlmError } from "@/llm/LlmClient";
 
 export class WorkshopParseError extends Schema.TaggedError<
   WorkshopParseError,
@@ -28,6 +29,8 @@ const ModelSuggestion = Schema.Struct({
 const decodeEnvelope = Schema.decodeUnknownEffect(
   Schema.Struct({ suggestions: Schema.Array(ModelSuggestion) }),
 );
+
+const parseJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** Some models return a bare array instead of the requested envelope. */
 const decodeBareArray = Schema.decodeUnknownEffect(Schema.Array(ModelSuggestion));
@@ -54,10 +57,8 @@ export const parseSuggestions = (
   raw: string,
   subject: SuggestionTarget,
 ): Effect.Effect<ReadonlyArray<SuggestionDraft>, WorkshopParseError> =>
-  Effect.try({
-    catch: () => new WorkshopParseError({ message: "Model did not return JSON.", raw }),
-    try: () => JSON.parse(extractJson(raw)),
-  }).pipe(
+  parseJson(extractJson(raw)).pipe(
+    Effect.mapError(() => new WorkshopParseError({ message: "Model did not return JSON.", raw })),
     Effect.flatMap((json) =>
       decodeEnvelope(json).pipe(
         Effect.map((envelope): ReadonlyArray<typeof ModelSuggestion.Type> => envelope.suggestions),
